@@ -1,0 +1,104 @@
+{
+  "_doc": "Layer registry: the top level of the data taxonomy. Layer -> Group -> Metric. Adding a data domain means adding a layer here; the app builds its navigation from the manifest and needs no code change.",
+
+  "_kinds": {
+    "metric": "Choropleth data. MUTUALLY EXCLUSIVE -- exactly one metric colors the map at a time, because a polygon has one fill. Selecting a new metric replaces the current one.",
+    "overlay": "Drawn on top of the choropleth. ADDITIVE -- any number can be visible at once (neighborhood outlines + transit lines + parks). Overlays carry no index/baseline; they are geometry plus labels, not measurements."
+  },
+
+  "layers": [
+    {
+      "id": "census-acs",
+      "label": "Census & Demographics",
+      "kind": "metric",
+      "enabled": true,
+      "order": 10,
+      "description": "American Community Survey 5-year estimates. Annual, small-area, survey-based -- every value carries a margin of error.",
+      "provider": {
+        "name": "US Census Bureau",
+        "url": "https://www.census.gov/programs-surveys/acs",
+        "attribution": "US Census Bureau, American Community Survey 5-Year Estimates",
+        "license": "public-domain"
+      },
+      "cadence": "annual",
+      "geoLevels": ["tract", "county-subdivision"],
+      "groups": [
+        { "id": "economy", "label": "Economy", "order": 10 },
+        { "id": "housing", "label": "Housing", "order": 20 },
+        { "id": "demographics", "label": "Demographics", "order": 30 },
+        { "id": "education", "label": "Education", "order": 40 }
+      ]
+    },
+
+    {
+      "id": "elections",
+      "label": "Politics & Elections",
+      "kind": "metric",
+      "enabled": false,
+      "order": 20,
+      "description": "Precinct and county election returns. NOTE: election geography is precincts, which do not nest inside census tracts and are redrawn frequently. Expect this layer to declare its own geoLevels rather than reusing the census ones -- which is exactly why geoLevels is a per-layer field.",
+      "provider": {
+        "name": "Ohio Secretary of State / MIT Election Lab",
+        "url": "https://electionlab.mit.edu/data",
+        "attribution": "MIT Election Data and Science Lab",
+        "license": "CC-BY"
+      },
+      "cadence": "biennial",
+      "geoLevels": ["county", "precinct"],
+      "groups": [
+        { "id": "turnout", "label": "Turnout", "order": 10 },
+        { "id": "results", "label": "Results & Margins", "order": 20 }
+      ]
+    },
+
+    {
+      "id": "weather",
+      "label": "Climate & Weather",
+      "kind": "metric",
+      "enabled": false,
+      "order": 30,
+      "description": "NOAA historical summaries. Station POINTS, not polygons -- values must be interpolated onto areas before they can be a choropleth, and that interpolation is an estimate that has to be disclosed.",
+      "provider": {
+        "name": "NOAA NCEI",
+        "url": "https://www.ncei.noaa.gov/cdo-web/",
+        "attribution": "NOAA National Centers for Environmental Information",
+        "license": "public-domain"
+      },
+      "cadence": "daily",
+      "geoLevels": ["tract", "county-subdivision"],
+      "groups": [{ "id": "temperature", "label": "Temperature", "order": 10 }]
+    },
+
+    {
+      "id": "neighborhoods",
+      "label": "Neighborhoods",
+      "kind": "overlay",
+      "enabled": false,
+      "order": 100,
+      "description": "Civic-association and named-place boundaries from Columbus open data. Display only: these do not nest inside census geography, so statistics are NOT recomputed onto them. Drawn as labeled outlines over whatever metric is active.",
+      "provider": {
+        "name": "City of Columbus Open Data",
+        "url": "https://opendata.columbus.gov/",
+        "attribution": "City of Columbus",
+        "license": "unknown-check-before-publishing"
+      },
+      "render": { "type": "boundary", "labelField": "name" }
+    },
+
+    {
+      "id": "osm-features",
+      "label": "Places & Infrastructure",
+      "kind": "overlay",
+      "enabled": false,
+      "order": 110,
+      "description": "Parks, transit, schools from OpenStreetMap via Overpass. Extracted at build time only -- Overpass is heavily rate-limited and must never be called from the browser.",
+      "provider": {
+        "name": "OpenStreetMap contributors",
+        "url": "https://www.openstreetmap.org/copyright",
+        "attribution": "(c) OpenStreetMap contributors",
+        "license": "ODbL"
+      },
+      "render": { "type": "point", "labelField": "name" }
+    }
+  ]
+}

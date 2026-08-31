@@ -1,0 +1,133 @@
+{
+  "$schema": "./metrics.schema.json",
+  "_doc": "Metric registry (leaves of the taxonomy). Every metric declares the layer it belongs to and the group within that layer -- both must exist in layers.json. Adding a metric = an entry here + re-running the ETL. No app code changes. 'kind' drives how the metro baseline is computed and how the value is formatted.",
+
+  "metrics": [
+    {
+      "id": "median-household-income",
+      "label": "Median Household Income",
+      "layer": "census-acs",
+      "group": "economy",
+      "kind": "median",
+      "unit": "usd",
+      "source": { "dataset": "acs/acs5", "value": "B19013_001E", "moe": "B19013_001M" },
+      "baseline": "published",
+      "baselineVar": "B19013_001E",
+      "higherIsBetter": true,
+      "description": "Median income of all households, in inflation-unadjusted dollars of the survey year. The relative index cancels inflation; the raw value does not."
+    },
+    {
+      "id": "population",
+      "label": "Total Population",
+      "layer": "census-acs",
+      "group": "demographics",
+      "kind": "count",
+      "unit": "people",
+      "source": { "dataset": "acs/acs5", "value": "B01003_001E", "moe": "B01003_001M" },
+      "baseline": "aggregate",
+      "higherIsBetter": null
+    },
+    {
+      "id": "median-home-value",
+      "label": "Median Home Value",
+      "layer": "census-acs",
+      "group": "housing",
+      "kind": "median",
+      "unit": "usd",
+      "source": { "dataset": "acs/acs5", "value": "B25077_001E", "moe": "B25077_001M" },
+      "baseline": "published",
+      "baselineVar": "B25077_001E",
+      "higherIsBetter": null
+    },
+    {
+      "id": "median-gross-rent",
+      "label": "Median Gross Rent",
+      "layer": "census-acs",
+      "group": "housing",
+      "kind": "median",
+      "unit": "usd-monthly",
+      "source": { "dataset": "acs/acs5", "value": "B25064_001E", "moe": "B25064_001M" },
+      "baseline": "published",
+      "baselineVar": "B25064_001E",
+      "higherIsBetter": null
+    },
+    {
+      "id": "poverty-rate",
+      "label": "Poverty Rate",
+      "layer": "census-acs",
+      "group": "economy",
+      "kind": "rate",
+      "unit": "percent",
+      "source": {
+        "dataset": "acs/acs5",
+        "numerator": "B17001_002E",
+        "denominator": "B17001_001E",
+        "numeratorMoe": "B17001_002M",
+        "denominatorMoe": "B17001_001M"
+      },
+      "baseline": "aggregate",
+      "higherIsBetter": false
+    },
+    {
+      "id": "owner-occupancy",
+      "label": "Owner-Occupied Housing",
+      "layer": "census-acs",
+      "group": "housing",
+      "kind": "rate",
+      "unit": "percent",
+      "source": {
+        "dataset": "acs/acs5",
+        "numerator": "B25003_002E",
+        "denominator": "B25003_001E"
+      },
+      "baseline": "aggregate",
+      "higherIsBetter": null
+    },
+    {
+      "id": "unemployment-rate",
+      "label": "Unemployment Rate",
+      "layer": "census-acs",
+      "group": "economy",
+      "kind": "rate",
+      "unit": "percent",
+      "source": {
+        "dataset": "acs/acs5",
+        "numerator": "B23025_005E",
+        "denominator": "B23025_003E"
+      },
+      "baseline": "aggregate",
+      "higherIsBetter": false,
+      "minYear": 2011,
+      "_note": "VERIFIED against the live API 2026-08-29: B23025 first appears in the 2011 ACS5 (2009 and 2010 return an error). Metrics may declare minYear/maxYear; the app greys out timeline years with no data rather than interpolating."
+    },
+    {
+      "id": "bachelors-or-higher",
+      "label": "Bachelor's Degree or Higher",
+      "layer": "census-acs",
+      "group": "education",
+      "kind": "rate",
+      "unit": "percent",
+      "source": {
+        "dataset": "acs/acs5",
+        "numeratorSum": ["B15003_022E", "B15003_023E", "B15003_024E", "B15003_025E"],
+        "denominator": "B15003_001E"
+      },
+      "baseline": "aggregate",
+      "higherIsBetter": true,
+      "minYear": 2012,
+      "_note": "VERIFIED 2026-08-29: B15003 first appears in the 2012 ACS5. B15002 IS available 2009-2011, so a backfill is possible -- see the fallback block below (not yet wired into the pipeline)."
+    },
+    {
+      "id": "median-age",
+      "label": "Median Age",
+      "layer": "census-acs",
+      "group": "demographics",
+      "kind": "median",
+      "unit": "years",
+      "source": { "dataset": "acs/acs5", "value": "B01002_001E", "moe": "B01002_001M" },
+      "baseline": "published",
+      "baselineVar": "B01002_001E",
+      "higherIsBetter": null
+    }
+  ]
+}

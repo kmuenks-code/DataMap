@@ -1,0 +1,71 @@
+{
+  "id": "columbus-oh",
+  "label": "Greater Columbus, OH",
+  "kind": "metro",
+  "cbsa": "18140",
+  "center": [-82.9988, 39.9612],
+  "zoom": 9,
+
+  "_comment_scope": "Columbus, OH MSA (OMB 2023) = 10 counties. Franklin alone is a valid 'lite' scope while developing -- it is ~330 tracts vs ~570 for the full MSA.",
+  "state": "39",
+  "counties": [
+    { "fips": "049", "name": "Franklin" },
+    { "fips": "041", "name": "Delaware" },
+    { "fips": "089", "name": "Licking" },
+    { "fips": "045", "name": "Fairfield" },
+    { "fips": "129", "name": "Pickaway" },
+    { "fips": "097", "name": "Madison" },
+    { "fips": "159", "name": "Union" },
+    { "fips": "117", "name": "Morrow" },
+    { "fips": "127", "name": "Perry" },
+    { "fips": "073", "name": "Hocking" }
+  ],
+
+  "geoLevels": [
+    {
+      "id": "tract",
+      "label": "Census Tract",
+      "censusFor": "tract:*",
+      "vintage": 2020,
+      "tigerLayer": "tract",
+      "simplify": "8%"
+    },
+    {
+      "id": "county-subdivision",
+      "label": "Township / City",
+      "censusFor": "county subdivision:*",
+      "vintage": 2020,
+      "default": true,
+      "tigerLayer": "cousub",
+      "simplify": "12%",
+      "_note": "DEFAULT. Stable across decades: measured 90% of areas have a complete 2009-2024 series, vs 43% for tracts. That is why the timeline lives here. See docs/geography-notes.md."
+    },
+    {
+      "id": "zcta",
+      "label": "ZIP Code Area",
+      "censusFor": "zip code tabulation area:*",
+      "vintage": 2020,
+      "tigerLayer": "zcta520",
+      "simplify": "10%",
+      "enabled": false
+    }
+  ],
+
+  "years": {
+    "dataset": "acs/acs5",
+    "min": 2009,
+    "max": 2024,
+    "_note": "VERIFIED against the live API 2026-08-29: ACS5 is published for 2009-2024; 2025 returns 404. ACS 5-year is the only product available at tract level.",
+    "boundaryEras": {
+      "_note": "VERIFIED by tract counts in Franklin County (39049). THREE eras, not two -- 2009 uses Census 2000 tracts, which is easy to miss.",
+      "2000": { "years": [2009], "franklinTracts": 264 },
+      "2010": { "years": [2010, 2019], "franklinTracts": 284 },
+      "2020": { "years": [2020, 2024], "franklinTracts": 328 }
+    }
+  },
+
+  "baseline": {
+    "mode": "aggregate",
+    "_note": "The 100% index denominator. 'aggregate' recomputes the metro value from component parts (correct for rates/ratios). 'published' pulls the CBSA-level value straight from the API (correct for medians, which cannot be aggregated)."
+  }
+}

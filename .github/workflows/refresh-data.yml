@@ -1,0 +1,49 @@
+name: Refresh Census data
+
+# ACS 5-year vintages publish once a year (typically December), so this runs
+# monthly rather than daily. The response cache means a run that finds nothing
+# new makes almost no API requests and produces no diff.
+on:
+  schedule:
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Restore ETL response cache
+        uses: actions/cache@v4
+        with:
+          path: etl/.cache
+          key: etl-cache-${{ github.run_id }}
+          restore-keys: etl-cache-
+
+      # Full run. Cached vintages cost nothing, so this only actually fetches a
+      # newly-published year; partial results splice in rather than truncate.
+      - run: npm run etl:columbus
+        env:
+          CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+
+      - name: Run transform tests before proposing a data change
+        run: npm test
+
+      # Open a PR rather than committing to main, so a bad upstream vintage
+      # never silently changes the live map.
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'data: refresh Census data'
+          title: 'data: refresh Census data'
+          branch: auto/data-refresh
+          add-paths: public/data

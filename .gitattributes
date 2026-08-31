@@ -1,0 +1,14 @@
+# Normalize to LF in the repository; check out native on Windows.
+# Set before the first commit -- doing it later rewrites every file.
+* text=auto eol=lf
+
+# Binary-ish payloads: never touch.
+*.png binary
+*.jpg binary
+*.zip binary
+*.pmtiles binary
+
+# Generated data. Marked so diffs stay readable in review but do not
+# dominate the stats on a data-refresh PR.
+public/data/**/*.json    linguist-generated=true
+public/data/**/*.topojson linguist-generated=true

@@ -1,0 +1,329 @@
+{
+  "schema": 2,
+  "generatedAt": "2026-08-30T01:13:36.218Z",
+  "regions": [
+    {
+      "id": "columbus-oh",
+      "label": "Greater Columbus, OH",
+      "kind": "metro",
+      "center": [
+        -82.9988,
+        39.9612
+      ],
+      "zoom": 9,
+      "geoLevels": [
+        {
+          "id": "tract",
+          "label": "Census Tract",
+          "areaCount": 651,
+          "geometryVintages": [
+            2010,
+            2020
+          ]
+        },
+        {
+          "id": "county-subdivision",
+          "label": "Township / City",
+          "default": true,
+          "areaCount": 188,
+          "geometryVintages": [
+            2010,
+            2020
+          ]
+        }
+      ],
+      "layers": [
+        {
+          "id": "census-acs",
+          "label": "Census & Demographics",
+          "kind": "metric",
+          "description": "American Community Survey 5-year estimates. Annual, small-area, survey-based -- every value carries a margin of error.",
+          "attribution": "US Census Bureau, American Community Survey 5-Year Estimates",
+          "groups": [
+            {
+              "id": "economy",
+              "label": "Economy",
+              "metrics": [
+                {
+                  "id": "median-household-income",
+                  "label": "Median Household Income",
+                  "unit": "usd",
+                  "kind": "median",
+                  "higherIsBetter": true,
+                  "description": "Median income of all households, in inflation-unadjusted dollars of the survey year. The relative index cancels inflation; the raw value does not.",
+                  "years": [
+                    2009,
+                    2010,
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                },
+                {
+                  "id": "poverty-rate",
+                  "label": "Poverty Rate",
+                  "unit": "percent",
+                  "kind": "rate",
+                  "higherIsBetter": false,
+                  "years": [
+                    2009,
+                    2010,
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                },
+                {
+                  "id": "unemployment-rate",
+                  "label": "Unemployment Rate",
+                  "unit": "percent",
+                  "kind": "rate",
+                  "higherIsBetter": false,
+                  "years": [
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "housing",
+              "label": "Housing",
+              "metrics": [
+                {
+                  "id": "median-gross-rent",
+                  "label": "Median Gross Rent",
+                  "unit": "usd-monthly",
+                  "kind": "median",
+                  "higherIsBetter": null,
+                  "years": [
+                    2009,
+                    2010,
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                },
+                {
+                  "id": "median-home-value",
+                  "label": "Median Home Value",
+                  "unit": "usd",
+                  "kind": "median",
+                  "higherIsBetter": null,
+                  "years": [
+                    2009,
+                    2010,
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                },
+                {
+                  "id": "owner-occupancy",
+                  "label": "Owner-Occupied Housing",
+                  "unit": "percent",
+                  "kind": "rate",
+                  "higherIsBetter": null,
+                  "years": [
+                    2009,
+                    2010,
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "demographics",
+              "label": "Demographics",
+              "metrics": [
+                {
+                  "id": "median-age",
+                  "label": "Median Age",
+                  "unit": "years",
+                  "kind": "median",
+                  "higherIsBetter": null,
+                  "years": [
+                    2009,
+                    2010,
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                },
+                {
+                  "id": "population",
+                  "label": "Total Population",
+                  "unit": "people",
+                  "kind": "count",
+                  "higherIsBetter": null,
+                  "years": [
+                    2009,
+                    2010,
+                    2011,
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "education",
+              "label": "Education",
+              "metrics": [
+                {
+                  "id": "bachelors-or-higher",
+                  "label": "Bachelor's Degree or Higher",
+                  "unit": "percent",
+                  "kind": "rate",
+                  "higherIsBetter": true,
+                  "years": [
+                    2012,
+                    2013,
+                    2014,
+                    2015,
+                    2016,
+                    2017,
+                    2018,
+                    2019,
+                    2020,
+                    2021,
+                    2022,
+                    2023,
+                    2024
+                  ],
+                  "geoLevels": [
+                    "tract",
+                    "county-subdivision"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
