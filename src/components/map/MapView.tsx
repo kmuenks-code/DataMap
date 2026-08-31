@@ -172,33 +172,32 @@ export function MapView() {
     m.on('zoomstart', () => (userMoved.current = true));
 
     /**
-     * Re-fit whenever the container's real size no longer matches what the map
-     * thinks it is.
+     * Re-fit until the user takes over.
      *
      * The map is constructed before the stylesheet applies (Vite injects CSS
-     * via JS in dev, and a slow stylesheet does the same in production), so the
-     * container is briefly 169x0 and the first fit is computed against a
-     * collapsed box -- leaving the region as a speck in the middle of the map.
-     * Comparing sizes rather than trusting a single event catches every case,
-     * and stops once the user takes control of the view.
+     * via JS in dev; a slow stylesheet does the same in production), so the
+     * container is briefly 169x0 and any fit computed then is wrong. An
+     * earlier version only re-fit when the container size disagreed with the
+     * map's cached size -- but once those agree the guard blocks correction
+     * forever, freezing whatever bad fit landed first. Re-fitting
+     * unconditionally is cheap, converges, and stops the moment the user pans
+     * or zooms.
      */
     const maybeRefit = () => {
       const el = m.getContainer();
-      const stale = m.transform.width !== el.clientWidth || m.transform.height !== el.clientHeight;
-      if (!stale || el.clientHeight === 0) return;
-      m.resize();
-      if (!userMoved.current && lastBounds.current) fitToBounds(m, lastBounds.current);
+      if (el.clientHeight === 0 || userMoved.current || !lastBounds.current) return;
+      fitToBounds(m, lastBounds.current);
     };
-    m.on('render', maybeRefit);
 
-    // Re-fit after a resize, not just resize(). The first fit runs while the
-    // sidebar and timeline are still settling, so it is computed against a
-    // stale container size and the region lands off-centre. Stops as soon as
-    // the user pans or zooms -- after that the view belongs to them.
     const ro = new ResizeObserver(maybeRefit);
     ro.observe(container.current);
 
+    // Safety net for the case where the container never changes size after the
+    // stylesheet lands, so the observer has nothing to report.
+    const settle = setTimeout(maybeRefit, 300);
+
     return () => {
+      clearTimeout(settle);
       ro.disconnect();
       m.remove();
       URL.revokeObjectURL(styleUrl);
@@ -218,17 +217,26 @@ export function MapView() {
 }
 
 function fitToBounds(m: maplibregl.Map, b: [number, number, number, number]): void {
-  const fit = () => {
-    // resize() first, every time. MapLibre caches the container size in its
-    // transform; at first paint that value predates the flex layout settling,
-    // so fitting against it zooms out too far. There is no event for "layout
-    // finished", and the container never changes size afterwards, so nothing
-    // would ever correct it.
-    m.resize();
-    m.fitBounds(b, { padding: { top: 40, right: 40, bottom: 110, left: 40 }, duration: 0 });
-  };
+  // resize() first. MapLibre caches the container size in its transform, and at
+  // first paint that value predates the stylesheet, so fitting against it is
+  // computed for the wrong box.
+  m.resize();
 
-  fit();
+  // Padding scales with the container. The timeline overlays the bottom of the
+  // map, so it needs clearance -- but a flat 110px eats a quarter of a short
+  // mobile viewport, leaving the region tiny.
+  const h = m.getContainer().clientHeight || 1;
+  const w = m.getContainer().clientWidth || 1;
+  const side = Math.min(40, w * 0.06);
+  m.fitBounds(b, {
+    padding: {
+      top: Math.min(40, h * 0.06),
+      right: side,
+      left: side,
+      bottom: Math.min(110, h * 0.2),
+    },
+    duration: 0,
+  });
 }
 
 function emptyCollection(): GeoJSON.FeatureCollection {
