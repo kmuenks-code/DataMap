@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import type { GeoLevelDef, RegionDef } from '../../config.ts';
+import { placeGeoidsForRegion } from '../census/places.ts';
 
 const run = promisify(execFile);
 const OUT = new URL('../../../../public/data/', import.meta.url);
@@ -68,6 +69,7 @@ async function buildOne(
   region: RegionDef,
   level: GeoLevelDef,
   vintage: number,
+  allowedGeoids: Set<string> | null,
 ): Promise<{ vintage: number; bytes: number; features: number } | null> {
   const release = RELEASE_FOR_VINTAGE[vintage];
   if (!release) {
@@ -85,7 +87,18 @@ async function buildOne(
       maxBuffer: 1024 * 1024 * 256,
     });
 
+    // How the state file is cut down to this region depends on the level.
+    //
+    // Tract and county-subdivision files carry COUNTYFP, so a county list is
+    // enough. The PLACE file does NOT -- verified: its fields are STATEFP,
+    // PLACEFP, PLACENS, GEOIDFQ, GEOID, NAME, NAMELSAD, STUSPS, STATE_NAME,
+    // LSAD, ALAND, AWATER. There is nothing to filter on but GEOID, which is
+    // the same reason the data side needs the relationship file. Both sides use
+    // ONE allowlist, so geometry and data can never disagree about membership.
     const counties = region.counties.map((c) => c.fips);
+    const filterExpr = allowedGeoids
+      ? `${JSON.stringify([...allowedGeoids])}.indexOf(GEOID) > -1`
+      : `${JSON.stringify(counties)}.indexOf(COUNTYFP) > -1`;
     const outDir = fileURLToPath(new URL(`regions/${region.id}/geometry/${level.id}/`, OUT));
     await mkdir(outDir, { recursive: true });
     const outFile = join(outDir, `${vintage}.topojson`);
@@ -97,7 +110,7 @@ async function buildOne(
         'mapshaper',
         join(work, 'in.json'),
         '-filter',
-        JSON.stringify(`${JSON.stringify(counties)}.indexOf(COUNTYFP) > -1`),
+        JSON.stringify(filterExpr),
         '-each',
         JSON.stringify('geoid = GEOID, name = NAME'),
         '-filter-fields',
@@ -134,8 +147,10 @@ export async function buildGeometry(region: RegionDef, vintages: number[]): Prom
   for (const level of region.geoLevels) {
     if (level.enabled === false) continue;
     console.log(`\n--- geometry: ${level.id} ---`);
+    const allowedGeoids =
+      level.restrictBy === 'place-by-county' ? await placeGeoidsForRegion(region) : null;
     for (const vintage of vintages) {
-      await buildOne(region, level, vintage);
+      await buildOne(region, level, vintage, allowedGeoids);
     }
   }
   await readdir(CACHE).catch(() => []);

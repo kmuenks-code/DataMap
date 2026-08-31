@@ -75,6 +75,8 @@ export interface ManifestLayer {
   groups?: ManifestGroup[];
   /** Present on overlay layers. */
   render?: { type: string; labelField?: string };
+  /** Overlay layers: how many shapes are in the file. */
+  areaCount?: number;
 }
 
 export function round(n: number | null, places: number): number | null {

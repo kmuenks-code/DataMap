@@ -12,6 +12,7 @@ import {
 } from './config.ts';
 import type { GeoLevelDef, LayerDef, MetricDef, RegionDef } from './config.ts';
 import { MAX_VARS_PER_CALL, fetchCensus, parseEstimate } from './sources/census/client.ts';
+import { placeGeoidsForRegion, restrictPlaces } from './sources/census/places.ts';
 import { boundaryVintageForYear } from './transform/crosswalk.ts';
 import {
   coefficientOfVariation,
@@ -31,10 +32,21 @@ export interface RunOptions {
   geoLevels?: string[];
 }
 
-/** state+county+tract (or +county subdivision) -- the join key to TIGER geometry. */
-function geoidOf(row: Record<string, string>, level: GeoLevelDef): string | null {
-  const unit = level.censusFor.split(':')[0]!; // "tract" | "county subdivision"
-  const parts = [row['state'], row['county'], row[unit]];
+/**
+ * The join key to TIGER geometry, assembled from the hierarchy this level
+ * actually has.
+ *
+ * County-nested levels concatenate state+county+unit (11 chars for a tract).
+ * Places have no county component -- their GEOID is state+place, 7 chars, and
+ * including `row['county']` would produce a key matching nothing, because the
+ * response has no such column. TIGER's place GEOID is built the same way.
+ */
+export function geoidOf(row: Record<string, string>, level: GeoLevelDef): string | null {
+  const unit = level.censusFor.split(':')[0]!; // "tract" | "county subdivision" | "place"
+  const parts =
+    level.censusIn === 'state'
+      ? [row['state'], row[unit]]
+      : [row['state'], row['county'], row[unit]];
   return parts.every(Boolean) ? parts.join('') : null;
 }
 
@@ -44,30 +56,42 @@ function shortName(name: string): string {
 }
 
 /**
- * One request per (year, county) carrying EVERY variable for every metric.
+ * One request per (year, scope) carrying EVERY variable for every metric.
  * This batching is what keeps a full 16-year build at ~180 requests instead of
  * a few thousand -- see the arithmetic in sources/census/acs.ts.
+ *
+ * "Scope" is per level: one call per county for county-nested levels, a single
+ * statewide call for places.
  */
 async function fetchYear(
   region: RegionDef,
   level: GeoLevelDef,
   year: number,
   vars: string[],
+  allowedGeoids: Set<string> | null,
 ): Promise<Map<string, Record<string, string>>> {
   const chunks: string[][] = [];
   for (let i = 0; i < vars.length; i += MAX_VARS_PER_CALL) {
     chunks.push(vars.slice(i, i + MAX_VARS_PER_CALL));
   }
 
+  // County-nested levels need one call per county. State-scoped levels (places)
+  // are ONE call for the whole state -- cheaper, but it returns every place in
+  // Ohio, so the region filter below is not optional.
+  const scopes: Record<string, string>[] =
+    level.censusIn === 'state'
+      ? [{ state: region.state }]
+      : region.counties.map((c) => ({ state: region.state, county: c.fips }));
+
   const merged = new Map<string, Record<string, string>>();
-  for (const county of region.counties) {
+  for (const inClause of scopes) {
     for (const chunk of chunks) {
       const rows = await fetchCensus({
         year,
         dataset: region.years.dataset,
         get: chunk,
         forClause: level.censusFor,
-        inClause: { state: region.state, county: county.fips },
+        inClause,
       });
       for (const row of rows) {
         const geoid = geoidOf(row, level);
@@ -76,7 +100,8 @@ async function fetchYear(
       }
     }
   }
-  return merged;
+
+  return allowedGeoids ? restrictPlaces(merged, allowedGeoids, String(year)) : merged;
 }
 
 /** The published metro-level value -- the only correct baseline for medians. */
@@ -93,6 +118,42 @@ async function fetchPublishedBaseline(
     forClause: `metropolitan statistical area/micropolitan statistical area:${region.cbsa}`,
   });
   return parseEstimate(rows[0]?.[variable]);
+}
+
+/**
+ * The metro rate, pooled from the CBSA's own published numerator and
+ * denominator rather than from the areas on screen.
+ *
+ * Needed by levels that do not tile the region. `computeBaseline` pools a rate
+ * over whatever areas it is handed, which is exactly right for tracts and
+ * county subdivisions -- they cover the metro completely, so pooling them IS
+ * the metro. Places cover 78% of it. Pooling those would pin 100 to "the rate
+ * among people who live in an incorporated place", so every unincorporated
+ * township would be measured against a yardstick that excludes it, and the
+ * number on the legend would no longer be the metro figure it claims to be.
+ */
+async function fetchCbsaRateBaseline(
+  region: RegionDef,
+  year: number,
+  m: MetricDef,
+): Promise<number | null> {
+  if (!region.cbsa) return null;
+  const s = m.source;
+  const vars = [
+    ...(s.numeratorSum ?? (s.numerator ? [s.numerator] : [])),
+    ...(s.denominator ? [s.denominator] : []),
+  ];
+  if (vars.length === 0) return null;
+
+  const rows = await fetchCensus({
+    year,
+    dataset: region.years.dataset,
+    get: vars,
+    forClause: `metropolitan statistical area/micropolitan statistical area:${region.cbsa}`,
+  });
+  // extract() already knows how to fold numeratorSum and divide; reusing it
+  // keeps the CBSA row and the area rows on exactly one code path.
+  return extract(m, rows[0]).value;
 }
 
 /** Pull one metric's numbers out of a raw row, respecting its shape. */
@@ -150,6 +211,19 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
   for (const level of levels) {
     console.log(`\n=== ${region.id} / ${level.id} ===`);
 
+    // A statewide query returns the whole state, so such a level must declare
+    // how it is cut back down to this region. Failing loudly beats shipping a
+    // map of all 1,265 Ohio places labelled "Greater Columbus".
+    if (level.censusIn === 'state' && !level.restrictBy) {
+      throw new Error(
+        `Geo level "${level.id}" fetches statewide but declares no restrictBy; ` +
+          'it would pull in every area in the state.',
+      );
+    }
+    const allowedGeoids =
+      level.restrictBy === 'place-by-county' ? await placeGeoidsForRegion(region) : null;
+    if (allowedGeoids) console.log(`  ${allowedGeoids.size} places in region`);
+
     const rowsByYear = new Map<number, Map<string, Record<string, string>>>();
 
     for (const year of years) {
@@ -162,7 +236,7 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
       if (active.length === 0) continue;
       const vars = [...new Set(active.flatMap(variablesFor))];
       process.stdout.write(`  ${year} (${vars.length} vars) ... `);
-      const rows = await fetchYear(region, level, year, vars);
+      const rows = await fetchYear(region, level, year, vars, allowedGeoids);
       rowsByYear.set(year, rows);
       console.log(`${rows.size} areas`);
     }
@@ -193,10 +267,15 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
         const rows = rowsByYear.get(year)!;
         const areas: AreaValue[] = geoids.map((g) => ({ ...extract(m, rows.get(g)), geoid: g }));
 
+        // Medians always come from the published CBSA figure (rule 1: never
+        // average medians). Rates come from the CBSA too when this level does
+        // not tile the region -- see fetchCbsaRateBaseline.
         const published =
           m.baseline === 'published' && m.baselineVar
             ? await fetchPublishedBaseline(region, year, m.baselineVar)
-            : null;
+            : level.tilesRegion === false && (m.kind === 'rate' || m.kind === 'ratio')
+              ? await fetchCbsaRateBaseline(region, year, m)
+              : null;
         const baseline = computeBaseline(m.kind, areas, published);
         baselines.push(round(baseline, 3));
 
@@ -216,6 +295,27 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
         metricYears.map((y) => [String(y), boundaryVintageForYear(y)]),
       );
       const spansVintages = new Set(Object.values(boundaryVintageByYear)).size > 1;
+
+      const notes: string[] = [];
+      if (spansVintages) {
+        notes.push(
+          'Spans multiple census boundary vintages; areas are NOT comparable across a ' +
+            'vintage break without a crosswalk. See docs/geography-notes.md.',
+        );
+      }
+      if (level.tilesRegion === false) {
+        notes.push(
+          'These areas do not cover the whole region -- roughly a fifth of the metro ' +
+            'population lives outside any of them. The baseline is the published metro ' +
+            'figure, not a total of what is shown, so the mapped areas do not sum to it.',
+        );
+      }
+      if (level.tilesRegion === false && m.kind === 'count') {
+        notes.push(
+          'Count metrics are indexed against the MEAN area, which at this level mixes a ' +
+            'city of 900,000 with villages of 300. Read the raw value, not the index.',
+        );
+      }
 
       const file: MetricFile = {
         schema: 1,
@@ -238,12 +338,7 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
           dataset: region.years.dataset,
           variables: variablesFor(m),
           boundaryVintageByYear,
-          notes: spansVintages
-            ? [
-                'Spans multiple census boundary vintages; areas are NOT comparable across a ' +
-                  'vintage break without a crosswalk. See docs/geography-notes.md.',
-              ]
-            : undefined,
+          notes: notes.length > 0 ? notes : undefined,
         },
       };
 
@@ -304,6 +399,8 @@ async function writeManifest(
     default?: boolean;
     areaCount: number;
     geometryVintages: number[];
+    tilesRegion?: boolean;
+    note?: string;
   }[] = [];
 
   for (const level of region.geoLevels) {
@@ -349,7 +446,26 @@ async function writeManifest(
       ...(level.default ? { default: true } : {}),
       areaCount,
       geometryVintages,
+      // Surfaced so the UI can warn that a level has gaps, rather than letting
+      // the reader assume the blank ground is missing data.
+      ...(level.tilesRegion === false ? { tilesRegion: false } : {}),
+      ...(level.note ? { note: level.note } : {}),
     });
+  }
+
+  // Which overlays actually have a file, read off disk for the same reason the
+  // metric tree is: an overlay listed in the manifest but missing on disk gives
+  // the user a toggle that does nothing.
+  const overlayDir = fileURLToPath(new URL(`regions/${region.id}/overlays/`, OUT));
+  const overlayCounts = new Map<string, number>();
+  for (const file of (await readdir(overlayDir).catch(() => [])).filter((f) =>
+    f.endsWith('.topojson'),
+  )) {
+    const topo = JSON.parse(await readFile(join(overlayDir, file), 'utf8')) as {
+      objects: Record<string, { geometries?: unknown[] }>;
+    };
+    const count = Object.values(topo.objects)[0]?.geometries?.length ?? 0;
+    overlayCounts.set(file.replace('.topojson', ''), count);
   }
 
   // Build the layer > group > metric tree, pruning anything empty so the UI
@@ -363,7 +479,7 @@ async function writeManifest(
       description: l.description,
       attribution: l.provider.attribution,
       ...(l.kind === 'overlay'
-        ? { render: l.render }
+        ? { render: l.render, areaCount: overlayCounts.get(l.id) ?? 0 }
         : {
             groups: (l.groups ?? [])
               .map((g) => ({
@@ -388,7 +504,9 @@ async function writeManifest(
               .filter((g) => g.metrics.length > 0),
           }),
     }))
-    .filter((l) => l.kind === 'overlay' || (l.groups?.length ?? 0) > 0);
+    .filter((l) =>
+      l.kind === 'overlay' ? (l.areaCount ?? 0) > 0 : (l.groups?.length ?? 0) > 0,
+    );
 
   await writeFile(
     fileURLToPath(new URL('manifest.json', OUT)),
@@ -417,6 +535,7 @@ async function writeManifest(
     (n, l) => n + (l.groups?.reduce((k, g) => k + g.metrics.length, 0) ?? 0),
     0,
   );
+  const overlayCount = tree.filter((l) => l.kind === 'overlay').length;
   console.log(`
-wrote manifest.json (${tree.length} layers, ${count} metrics, ${geoLevels.length} geo levels)`);
+wrote manifest.json (${tree.length} layers, ${count} metrics, ${overlayCount} overlays, ${geoLevels.length} geo levels)`);
 }

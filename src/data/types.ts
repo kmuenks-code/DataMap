@@ -33,6 +33,15 @@ export interface GeoLevelSummary {
   default?: boolean;
   areaCount: number;
   /**
+   * False when the level's areas do NOT cover the whole region, so blank
+   * ground is a real gap rather than missing data. Places leave roughly a
+   * fifth of the metro population uncovered; the UI has to say so, or the
+   * reader will read empty townships as "no data here".
+   */
+  tilesRegion?: boolean;
+  /** Caveat too long for the button label. */
+  note?: string;
+  /**
    * Boundary vintages with geometry on disk. Census areas are redrawn each
    * decade, so the app must pick polygons by the selected year's vintage --
    * see geometryVintageFor().
@@ -58,6 +67,8 @@ export interface LayerSummary {
   groups?: GroupSummary[];
   /** Overlay layers only. */
   render?: { type: string; labelField?: string };
+  /** Overlay layers only: shape count in the overlay file. */
+  areaCount?: number;
 }
 
 export interface GroupSummary {

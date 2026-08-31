@@ -41,6 +41,19 @@
       "_note": "DEFAULT. Stable across decades: measured 90% of areas have a complete 2009-2024 series, vs 43% for tracts. That is why the timeline lives here. See docs/geography-notes.md."
     },
     {
+      "id": "place",
+      "label": "City / Suburb",
+      "censusFor": "place:*",
+      "censusIn": "state",
+      "restrictBy": "place-by-county",
+      "tilesRegion": false,
+      "vintage": 2020,
+      "tigerLayer": "place",
+      "simplify": "12%",
+      "note": "Municipal limits. Only ~78% of the metro lives inside one; unincorporated township land is blank.",
+      "_note": "The colloquial geography -- Dublin, Upper Arlington, Hilliard as residents actually name them, on real annexed city limits that cut across townships and county lines. Medians are PUBLISHED at this level (verified 2009-2024), so no aggregation and no averaging of medians. Two costs: it does not tile the metro (137 places, 78.2% of population; the other 21.8% is unincorporated), and 105 of the 137 places are under 5,000 people, so rule 5 applies harder here than anywhere else."
+    },
+    {
       "id": "zcta",
       "label": "ZIP Code Area",
       "censusFor": "zip code tabulation area:*",

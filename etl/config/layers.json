@@ -71,16 +71,25 @@
 
     {
       "id": "neighborhoods",
-      "label": "Neighborhoods",
+      "label": "Columbus Neighborhoods",
       "kind": "overlay",
-      "enabled": false,
+      "enabled": true,
       "order": 100,
-      "description": "Civic-association and named-place boundaries from Columbus open data. Display only: these do not nest inside census geography, so statistics are NOT recomputed onto them. Drawn as labeled outlines over whatever metric is active.",
+      "description": "The city's own 41 community areas -- Clintonville, German Village, Franklinton, the University District. Display only: they follow streets and rivers, not tract lines, so no statistic is recomputed onto them. Covers the city of Columbus only; suburbs are named by the City / Suburb geography instead.",
       "provider": {
         "name": "City of Columbus Open Data",
         "url": "https://opendata.columbus.gov/",
         "attribution": "City of Columbus",
-        "license": "unknown-check-before-publishing"
+        "license": "CC0-1.0"
+      },
+      "_license_note": "VERIFIED 2026-08-31 from the portal item metadata: license CC0-1.0 / licenseInfo CC0. Previously recorded as unknown-check-before-publishing.",
+      "_source_note": "Layer 25, 'Columbus Communities'. Deliberately NOT layer 12, 'Area Commissions': that one covers only part of the city (21 polygons vs 41) and its attribute table carries volunteer names, personal emails and phone numbers, none of which belongs in a public static bundle.",
+      "source": {
+        "type": "arcgis",
+        "url": "https://maps2.columbus.gov/arcgis/rest/services/Schemas/Development/MapServer/25",
+        "nameField": "AREA_NAME",
+        "simplify": "6%",
+        "regions": ["columbus-oh"]
       },
       "render": { "type": "boundary", "labelField": "name" }
     },

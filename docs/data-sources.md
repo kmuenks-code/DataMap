@@ -41,6 +41,8 @@ Three rules keep it that way:
 - **Errors can arrive as HTTP 200.** Missing key, bad key, and unknown variable names all return an HTML page with a 200 status. Never call `res.json()` without checking the content type.
 - **Variables get renamed between vintages.** `B15003` replaced `B15002` in 2012; `B23025` starts in 2010. Hence `minYear` in the metric registry.
 - **Tract boundaries change every decade.** See `etl/src/transform/crosswalk.ts` — this is the single biggest correctness risk in the project.
+- **Places do not nest inside counties.** `for=place:*&in=state:39 county:049` is HTTP 400. Places must be fetched statewide (one call, not ten) and filtered afterwards. See `etl/src/sources/census/places.ts` and `docs/geography-notes.md`.
+- **Summary level 070 publishes no medians.** `place/remainder (or part)` gives a complete, familiarly-named tiling of each township, but `B19013` is null on every row and it costs one request per county subdivision. Counts and rates only.
 
 ## Geometry — TIGER/Line cartographic boundaries
 
@@ -64,6 +66,49 @@ npx mapshaper cb_2023_39_tract_500k.shp \
 
 TopoJSON stores each shared border once; with tracts, which share every edge, it lands 70–80% under the equivalent GeoJSON.
 
+## Census place/county relationship file
+
+One static, pipe-delimited national table, cached in `etl/.cache/geo/`:
+
+```
+https://www2.census.gov/geo/docs/reference/codes2020/national_place_by_county2020.txt
+STATE|STATEFP|COUNTYFP|COUNTYNAME|PLACEFP|PLACENS|PLACENAME|TYPE|CLASSFP|FUNCSTAT
+```
+
+This is what makes the `place` geo level possible without a hand-maintained FIPS list.
+It answers "which places are in this metro?" in **one request**, and the answer is
+derived at build time, so a newly incorporated village appears on the next rebuild.
+
+**Verified 2026-08-31:** the 137 places it yields for the 10-county Columbus MSA match,
+one for one, the 137 found by querying summary level 070 across all 181 county
+subdivisions — at 1 request instead of 181. The single discrepancy is instructive:
+Hidden Lakes CDP is `35133` in the 2020 file and `35119` from the 2023 vintage onward.
+Population 0, so it drops harmlessly, but `restrictPlaces()` logs any such drop rather
+than hiding it.
+
+Caveats: there is **no 2010-vintage equivalent** at a stable URL, so the 2020 table
+filters both geometry vintages. Places created after 2020 are absent until the next
+decennial file.
+
+## City of Columbus GIS — neighborhood overlay
+
+```
+https://maps2.columbus.gov/arcgis/rest/services/Schemas/Development/MapServer/25
+```
+
+**"Columbus Communities"** — 41 polygons, field `AREA_NAME`, covering the entire city.
+Serves GeoJSON directly with `f=geojson&outSR=4326`. **License CC0-1.0**, verified
+2026-08-31 from the portal item metadata (this replaces the earlier
+`unknown-check-before-publishing` placeholder in `layers.json`).
+
+Deliberately NOT layer 12, **"Area Commissions"**: 21 polygons covering only part of the
+city, and its attribute table carries volunteer names, personal emails and phone
+numbers. The overlay builder keeps only the `name` field for exactly this reason.
+
+Fetched at build time, cached in `etl/.cache/arcgis/`, emitted as TopoJSON to
+`public/data/regions/<id>/overlays/`. Unlike ACS vintages this source *can* change, so
+refresh means deleting the cache file rather than waiting for an automatic invalidation.
+
 ## Basemap
 
 **The app ships with no basemap, and that is deliberate.** Verified 2026-08-29: CARTO's
@@ -84,7 +129,7 @@ raster tile template. Options, best first:
   client — restrict it by HTTP referrer and treat it as public.
 - **Raw OSM tiles** — the OSMF tile usage policy forbids sustained app use. Do not.
 
-### Two MapLibre traps, both verified here
+### Three MapLibre traps, all verified here
 
 1. **Never gate `addSource`/`addLayer` on the `load` event.** `load` waits for the style
    *and its sources*, so a slow or blocked basemap means your own data never renders. Key
@@ -93,6 +138,12 @@ raster tile template. Options, best first:
    stays false forever, no layers register, and no error is raised. The byte-identical
    style passed as a *URL* loads immediately. `basemap.ts` serialises the style to a blob
    URL for this reason.
+3. **A `symbol` layer with `text-field` needs a `glyphs` URL**, which means fetching PBF
+   font ranges from a third-party server at runtime — a runtime external dependency, and
+   the end of the offline guarantee. Overlay labels are therefore plain DOM markers
+   (`maplibregl.Marker`), which need no glyphs, no network and no basemap. They also get
+   no automatic collision avoidance, so labels are hidden below a zoom threshold rather
+   than allowed to pile up.
 
 ## Future sources (deferred, but the architecture leaves room)
 
@@ -100,6 +151,5 @@ raster tile template. Options, best first:
 |---|---|---|
 | NOAA/NWS historical weather | `ncei.noaa.gov/cdo-web/api/v2` | Token required; daily summaries by station. Points, not polygons — needs interpolation to areas. |
 | OpenStreetMap features | Overpass API | Heavily rate-limited; extract once at build time, never at runtime. |
-| Neighborhood boundaries | City of Columbus open data / ArcGIS REST | Columbus publishes civic-association boundaries. **No federal equivalent** — these are locally defined and do not nest inside tracts, so expect an areal-interpolation step. |
 | BLS employment | `api.bls.gov/publicAPI/v2` | County-level; 500 queries/day registered. |
 | Zillow ZHVI | static CSV | ZIP/metro level, monthly, no key. |

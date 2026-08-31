@@ -47,6 +47,11 @@ Layers do NOT share geographies (elections are precinct-level, not tract-level),
 `geoLevels` is per-layer and each metric records the levels it was actually built for.
 The UI must handle "this metric doesn't exist at the current geo level".
 
+Geo levels also differ in HOW they are fetched and whether they cover the region:
+`censusIn` ('county' = one call per county; 'state' = one statewide call + a `restrictBy`
+rule) and `tilesRegion` (false = the level leaves gaps, so rate baselines come from the
+published CBSA rather than being pooled from what's on screen). See `docs/layers.md`.
+
 ## Core concept: the relative index
 
 ```
@@ -67,8 +72,8 @@ These are correctness traps, not style preferences. Details in `docs/data-source
 3. **Tract boundaries change every decade — and there are THREE eras, not two.**
    2009 = Census 2000 tracts, 2010–2019 = 2010 tracts, 2020–2024 = 2020 tracts.
    Measured consequence: only **43% of tracts** have a complete 2009–2024 series, versus
-   **90% of county subdivisions**. Build the timeline on county subdivisions until a
-   crosswalk exists. See `etl/src/transform/crosswalk.ts`.
+   **90% of county subdivisions** and **77% of places**. Build the timeline on county
+   subdivisions until a crosswalk exists. See `etl/src/transform/crosswalk.ts`.
 4. **ACS 5-year estimates overlap.** Consecutive years share sample and are not independent.
 5. **Surface uncertainty, and beware small areas.** Tract MOEs are large; the ETL ships a
    CV per area/year. Measured: the largest apparent "movers" are rural townships of
@@ -82,6 +87,15 @@ These are correctness traps, not style preferences. Details in `docs/data-source
    silently cost 320 needless refetches.
 7. **The Census API returns HTTP 200 with HTML on error** (missing/bad key, unknown
    variable). `res.ok` is not enough — check the content type. A key is now mandatory.
+   The same is true of `www2.census.gov` files and the ArcGIS overlay endpoint.
+8. **A place does not nest inside a county.** `for=place:*&in=state:39 county:049` is a
+   400. Places are fetched statewide and filtered by the Census place/county
+   relationship file; that same allowlist filters the geometry, because the TIGER place
+   shapefile has no COUNTYFP field. A place GEOID is state+place (7 chars), NOT
+   state+county+place — `geoidOf()` branches on `censusIn`.
+9. **Places don't tile the metro.** 137 places hold 78.2% of the population; the other
+   21.8% is unincorporated and blank. Never pool a rate baseline over a level with
+   `tilesRegion: false` — it would redefine "100" as the incorporated-population rate.
 
 ## Adding things
 
@@ -90,6 +104,8 @@ These are correctness traps, not style preferences. Details in `docs/data-source
 - **A data domain** (politics, weather, transit) → one entry in `etl/config/layers.json`
   plus a fetcher under `etl/src/sources/` emitting the standard `MetricFile`. No app code.
 - **A city** → one file in `etl/config/regions/`. No app code.
+- **An overlay** (neighborhoods, districts) → one `layers.json` entry with a `source`
+  block pointing at an ArcGIS endpoint. No app code. Only the name field ships.
 - **The 50-state view** → a region with `kind: "state"`, baseline = US. No app code.
 - **A new data source** → a new dir under `etl/src/sources/` emitting the same `MetricFile`
   shape. The app never learns where a metric came from.
@@ -111,22 +127,32 @@ npm run build && npm run preview
 
 ## Status
 
-**Working:** the full ETL runs end to end, with 14 passing tests over the transform core.
-`public/data/` holds 9 metrics x 16 years (2009-2024) x 2 geo levels, 1.9 MB total.
+**Working:** the full ETL runs end to end, with 26 passing tests over the transform core
+and the place/geoid logic. `public/data/` holds 9 metrics x 16 years (2009-2024) x 3 geo
+levels, plus one overlay. 2.6 MB total.
 Cold build = 404 requests / ~4.5 min; any rebuild after that = 0 requests / 1.2s.
 Partial runs (`--metric`, `--years`, `--geo`) splice into existing files rather than
 truncating them, so incremental refresh is the normal path.
 Geometry is built too: TopoJSON per boundary vintage, joins verified against the data.
 **The app runs**: choropleth, layer/group/metric picker, geography switch, view-mode
 toggle, year scrubber with play, per-area trend sparkline, rank/percentile detail panel,
-and CV-based fading. Verified in-browser end to end.
-**Not yet implemented:** overlay layer rendering (the registry and UI exist, no geometry
-source yet), URL state/deep links, and the tract-era crosswalk.
+CV-based fading, and overlay outlines with labels. Verified in-browser end to end.
+**Not yet implemented:** URL state/deep links, and the tract-era crosswalk.
 
 Verified facts (2026-08-29, live API) that override anything ACS docs may suggest:
 - ACS5 is published for **2009-2024**; 2025 returns 404.
 - Default geo level is **county-subdivision** (townships/cities), chosen for timeline
   integrity; tract is available and better-looking but has a broken pre-2020 series.
+- **`place` is the colloquial geography** — Dublin, Upper Arlington, Hilliard on real
+  annexed city limits that cut across townships and counties. ACS publishes medians per
+  place for all of 2009-2024 and place FIPS are stable (Dublin = 3922694 throughout), so
+  it costs 1 request/year and breaks no data rule. Its two costs are coverage (78.2%) and
+  small-area noise (105 of 137 places are under 5,000 people). See `docs/geography-notes.md`.
+- **Summary level 070 (`place/remainder`) publishes NO medians** — verified null — and
+  needs one request per county subdivision. Evaluated and rejected; don't revisit it.
+- Overlay labels are **DOM markers, not MapLibre symbol layers**: `text-field` requires a
+  `glyphs` URL, i.e. runtime font fetches from a third party. Markers get no collision
+  avoidance, so labels hide below zoom 9.5.
 - **No basemap ships by default**: CARTO's keyless tiles now return "API KEY REQUIRED",
   and a key in a static bundle is a public key. Set `VITE_BASEMAP_TILES` to add one;
   self-hosted Protomaps is the recommended route. See `docs/data-sources.md`.
@@ -148,7 +174,8 @@ Verified facts (2026-08-29, live API) that override anything ACS docs may sugges
   Nothing is decided; see rule 5.
 - Pre-2012 education backfill via `B15002` is possible (verified available 2009-2011)
   but not wired up.
-- Neighborhood overlays don't nest in tracts — display-only, or interpolate?
+- Neighborhood overlays don't nest in tracts. Currently display-only, which is the
+  honest default; interpolation remains unbuilt and would need its error disclosed.
 - Whether to commit regenerated data (history growth) or build in CI. See `docs/deployment.md`.
 
 ## Conventions

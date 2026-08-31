@@ -34,12 +34,16 @@ const years = values.years
 const started = Date.now();
 
 if (values.only !== 'metrics') {
-  const { loadRegion } = await import('./config.ts');
+  const { loadLayers, loadRegion } = await import('./config.ts');
   const { buildGeometry } = await import('./sources/tiger/geometry.ts');
+  const { buildOverlays } = await import('./sources/arcgis/overlays.ts');
   const region = await loadRegion(values.region!);
   // One file per boundary vintage: tracts are redrawn each decade, so no single
   // geometry file can serve 2009-2024. See sources/tiger/geometry.ts.
   await buildGeometry(region, [2020, 2010]);
+  // Overlays are geometry too, but carry no data and no vintage -- see
+  // sources/arcgis/overlays.ts.
+  await buildOverlays(region, await loadLayers());
 }
 
 if (values.only !== 'geometry') {

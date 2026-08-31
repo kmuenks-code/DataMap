@@ -33,11 +33,29 @@ Conflating the two is the mistake worth avoiding: "show me median income *and* n
 
 No app code changes. `loadMetrics()` validates every `layer`/`group` reference at build time and fails the run on a dangling one — otherwise a typo produces a file on disk that no navigation path reaches, which is far harder to notice than a crash.
 
-Set `enabled: false` to hide a layer without deleting its registry entries. The `elections`, `weather`, `neighborhoods`, and `osm-features` layers are already declared that way — they are structural placeholders proving the shape works, not stubs to be filled in blindly.
+Set `enabled: false` to hide a layer without deleting its registry entries. The `elections`, `weather`, and `osm-features` layers are still declared that way — they are structural placeholders proving the shape works, not stubs to be filled in blindly.
+
+The `neighborhoods` overlay is now **live**, and it is the worked example of the overlay half of the taxonomy: one entry in `layers.json` carrying a `source` block, one generic fetcher (`etl/src/sources/arcgis/overlays.ts`), and no app code. An overlay layer declares where its geometry comes from:
+
+```json
+"source": {
+  "type": "arcgis",
+  "url": "https://…/MapServer/25",
+  "nameField": "AREA_NAME",
+  "simplify": "6%",
+  "regions": ["columbus-oh"]
+}
+```
+
+`regions` scopes a source to the metros it actually describes — Columbus's community boundaries mean nothing in another city, and a region without a source simply never shows the layer. Only `nameField` survives into the output: some source tables carry personal contact details, and an overlay ships nothing but a shape and a name.
 
 ## What varies per layer
 
-**Geography.** Layers do not share geographies. Census data is tract and county-subdivision; election returns are precincts, which do not nest inside tracts and are redrawn frequently. Hence `geoLevels` is a per-layer field, and each metric records the levels it was actually built for. The UI must handle "this metric does not exist at the current level" — grey it out, or offer to switch level.
+**Geography.** Layers do not share geographies. Census data is tract, county-subdivision and place; election returns are precincts, which do not nest inside tracts and are redrawn frequently. Hence `geoLevels` is a per-layer field, and each metric records the levels it was actually built for. The UI must handle "this metric does not exist at the current level" — grey it out, or offer to switch level.
+
+**How a level is fetched.** Not every geography nests the same way, and the registry has to say which. `censusIn: "county"` (the default) means one request per county; `censusIn: "state"` means one statewide request plus a `restrictBy` rule to cut it back to the region. Places need the latter, because a place is not inside a county. A level that fetches statewide without declaring `restrictBy` throws rather than quietly mapping the whole state.
+
+**Whether a level covers the region.** `tilesRegion: false` marks a level whose areas leave gaps — places miss 22% of the metro's population. It changes two things: rate baselines come from the published CBSA figures instead of being pooled from the areas on screen, and the UI shows the level's `note` so blank ground does not read as missing data.
 
 **Cadence.** ACS is annual, elections biennial, weather daily. The timeline should reflect the metric's real years (`metric.years`), never a global range.
 
@@ -52,6 +70,9 @@ Metric files are namespaced by layer, because two sources may both publish somet
 ```
 public/data/regions/<region>/metrics/<geoLevel>/<layer>/<metric>.json
 public/data/regions/<region>/geometry/<geoLevel>/<boundaryVintage>.topojson
+public/data/regions/<region>/overlays/<layer>.topojson
 ```
+
+Overlay files carry **no vintage** in the path. Metrics need geometry per boundary vintage because census areas are redrawn each decade and the year decides which polygons are correct; an overlay has no time dimension at all, so one file serves every year.
 
 Geometry is keyed by **boundary vintage, not by level**, since census areas are redrawn each decade. `geometryVintageFor(level, year)` in `src/data/types.ts` picks the newest vintage not postdating the selected year. Drawing 2020 polygons under 2012 data is exactly the silent-wrong-map failure this prevents.

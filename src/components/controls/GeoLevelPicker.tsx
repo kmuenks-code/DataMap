@@ -6,19 +6,29 @@ export function GeoLevelPicker() {
   const setGeoLevel = useAppStore((s) => s.setGeoLevel);
   if (!region) return null;
 
+  const active = region.geoLevels.find((g) => g.id === geoLevelId);
+
   return (
-    <div className="segmented">
-      {region.geoLevels.map((g) => (
-        <button
-          key={g.id}
-          className={g.id === geoLevelId ? 'active' : ''}
-          onClick={() => setGeoLevel(g.id)}
-          title={`${g.areaCount} areas`}
-        >
-          {g.label}
-        </button>
-      ))}
-    </div>
+    <>
+      <div className="segmented">
+        {region.geoLevels.map((g) => (
+          <button
+            key={g.id}
+            className={g.id === geoLevelId ? 'active' : ''}
+            onClick={() => setGeoLevel(g.id)}
+            title={g.note ? `${g.areaCount} areas -- ${g.note}` : `${g.areaCount} areas`}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+      {/*
+        A level that does not cover the whole metro leaves real holes in the
+        map. Without saying so, a reader takes blank ground for missing data
+        rather than for land that belongs to no city.
+      */}
+      {active?.note && <p className="level-note">{active.note}</p>}
+    </>
   );
 }
 

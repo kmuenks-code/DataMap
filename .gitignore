@@ -13,3 +13,4 @@ etl/.tmp/
 .vscode/
 .idea/
 *.log
+tsconfig.tsbuildinfo

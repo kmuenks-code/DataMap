@@ -41,3 +41,14 @@ export const loadMetric = (region: string, geoLevel: string, layer: string, metr
  */
 export const loadGeometry = (region: string, geoLevel: string, vintage: number) =>
   loadJson<unknown>(`regions/${region}/geometry/${geoLevel}/${vintage}.topojson`);
+
+/**
+ * Overlay geometry: one file per layer, with NO vintage in the path.
+ *
+ * Metrics need geometry per boundary vintage because census areas are redrawn
+ * each decade and the year decides which polygons are correct. Overlays carry
+ * no time dimension at all -- they are the current outlines of named places, so
+ * one file serves every year.
+ */
+export const loadOverlay = (region: string, layer: string) =>
+  loadJson<unknown>(`regions/${region}/overlays/${layer}.topojson`);

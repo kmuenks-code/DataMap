@@ -34,6 +34,22 @@ export interface LayerDef {
   geoLevels?: string[];
   groups?: LayerGroup[];
   render?: { type: string; labelField?: string };
+  /**
+   * Where an OVERLAY layer's geometry comes from. Metric layers have no
+   * `source` -- their data is described per metric in metrics.json.
+   *
+   * `regions` scopes a source to the metros it actually describes: Columbus's
+   * community boundaries are meaningless in another city, and a region without
+   * a source for a layer simply never shows it.
+   */
+  source?: {
+    type: 'arcgis';
+    url: string;
+    /** Attribute holding the display name; renamed to `name` on the way out. */
+    nameField: string;
+    simplify?: string;
+    regions?: string[];
+  };
 }
 
 export interface MetricDef {
@@ -58,11 +74,48 @@ export interface GeoLevelDef {
   id: string;
   label: string;
   censusFor: string;
+  /**
+   * Where this level sits in the Census hierarchy, which decides how it is
+   * fetched. NOT cosmetic -- getting it wrong is an HTTP 400.
+   *
+   *   'county' (default) -- `in=state:XX county:YYY`, one call per county.
+   *                         Tracts and county subdivisions require this; a bare
+   *                         `in=state:XX` is rejected for them.
+   *   'state'            -- `in=state:XX` only, one call for the whole state.
+   *                         Places take this form because a place is NOT nested
+   *                         inside a county: Dublin spans Franklin, Delaware and
+   *                         Union. Verified live -- adding `county:049` to a
+   *                         place query returns 400 "unknown/unsupported
+   *                         geography hierarchy".
+   */
+  censusIn?: 'county' | 'state';
+  /**
+   * How to cut a state-wide response down to this region. Required when
+   * `censusIn` is 'state', because such a query returns every area in Ohio.
+   *
+   *   'place-by-county' -- the Census place/county relationship file. Also
+   *                        filters the TIGER geometry, which for places carries
+   *                        no COUNTYFP field to filter on.
+   */
+  restrictBy?: 'place-by-county';
+  /**
+   * Whether this level's areas cover the whole region.
+   *
+   * Tracts and county subdivisions tile the metro exactly, so a rate baseline
+   * can be pooled from the areas themselves. Places do NOT: 22% of the metro
+   * population lives in unincorporated township land that belongs to no place.
+   * Pooling over places would pin "100" to the metro's incorporated population
+   * rather than to the metro, quietly redefining the index. Levels that do not
+   * tile pull their rate baselines from the published CBSA figures instead.
+   */
+  tilesRegion?: boolean;
   vintage: number;
   default?: boolean;
   tigerLayer: string;
   simplify: string;
   enabled?: boolean;
+  /** Shown in the UI where this level needs a caveat the label cannot carry. */
+  note?: string;
 }
 
 export interface RegionDef {
