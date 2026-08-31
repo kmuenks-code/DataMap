@@ -35,6 +35,23 @@ function cacheDerived(
   return built;
 }
 
+/**
+ * Do the loaded data and the loaded polygons describe the same geography?
+ *
+ * Guards the join against the transient state after a geography switch, when
+ * one of the two has arrived and the other has not. Joining across that gap
+ * yields zero geoid matches, and because the join is memoised the empty result
+ * would stick permanently -- a blank map that depends on network ordering, so
+ * it reproduces on a deployed site and not on a warm local one.
+ */
+export function geometryMatchesFile(
+  file: Pick<MetricFile, 'geoLevel'>,
+  topo: { level: string; vintage: number },
+  vintage: number | undefined,
+): boolean {
+  return file.geoLevel === topo.level && vintage === topo.vintage;
+}
+
 export interface MapFeatureProps {
   geoid: string;
   name: string;
@@ -59,7 +76,18 @@ export function useMetricData() {
   const region = useAppStore((s) => s.region());
 
   const [file, setFile] = useState<MetricFile | null>(null);
-  const [topo, setTopo] = useState<Topology | null>(null);
+  /**
+   * The topology is tagged with the level and vintage it was fetched FOR.
+   *
+   * Data and geometry load in two independent effects, so between a geography
+   * switch and the second response landing, the new metric file coexists with
+   * the previous level's polygons. Joining those two produces zero matches --
+   * and the join is memoised, so that empty result would be cached under the
+   * new level's key and never recomputed: a permanently blank map, reached only
+   * when the responses happen to arrive in that order. The tag is what lets the
+   * join tell "still loading" apart from "genuinely no overlap".
+   */
+  const [topo, setTopo] = useState<{ level: string; vintage: number; topo: Topology } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -84,7 +112,7 @@ export function useMetricData() {
     if (!regionId || !geoLevelId || vintage == null) return;
     let cancelled = false;
     loadGeometry(regionId, geoLevelId, vintage)
-      .then((t) => !cancelled && setTopo(t as Topology))
+      .then((t) => !cancelled && setTopo({ level: geoLevelId, vintage, topo: t as Topology }))
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
       cancelled = true;
@@ -94,17 +122,23 @@ export function useMetricData() {
   const collection = useMemo<FeatureCollection<Geometry, MapFeatureProps> | null>(() => {
     if (!file || !topo || year == null) return null;
 
+    // Both sides must describe the SAME geography before they are joined, or a
+    // mid-switch pairing gets memoised as an empty map. See the note on `topo`.
+    if (!geometryMatchesFile(file, topo, vintage)) return null;
+
     const yearIndex = file.years.indexOf(year);
     if (yearIndex === -1) return null;
 
-    const objectName = Object.keys(topo.objects)[0];
+    const objectName = Object.keys(topo.topo.objects)[0];
     if (!objectName) return null;
 
-    return cacheDerived(`${file.region}/${file.geoLevel}/${file.metric}/${year}`, () => {
+    // Vintage belongs in the key too: one level's data is joined to different
+    // polygons either side of a decennial redraw.
+    return cacheDerived(`${file.region}/${file.geoLevel}/${topo.vintage}/${file.metric}/${year}`, () => {
       const ranks = rankAll(file, yearIndex);
       const byGeoid = new Map(file.geoids.map((g, i) => [g, i]));
 
-      const fc = feature(topo, topo.objects[objectName]!) as unknown as FeatureCollection<
+      const fc = feature(topo.topo, topo.topo.objects[objectName]!) as unknown as FeatureCollection<
         Geometry,
         { geoid?: string; name?: string }
       >;
@@ -138,7 +172,7 @@ export function useMetricData() {
 
       return { type: 'FeatureCollection' as const, features };
     });
-  }, [file, topo, year]);
+  }, [file, topo, year, vintage]);
 
   return { file, collection, loading, error, vintage };
 }
