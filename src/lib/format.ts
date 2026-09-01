@@ -20,18 +20,22 @@ export function formatValue(value: number | null, unit: string): string {
   }
 }
 
-/** The index is the headline number, so it reads as "of metro average". */
+/** The index is the headline number, so it reads as "of <baseline> average". */
 export function formatIndex(index: number | null): string {
   if (index == null) return '—';
   return `${index.toFixed(0)}%`;
 }
 
-/** Signed distance from the metro baseline, which is what the timeline is really about. */
-export function formatRelative(index: number | null): string {
+/**
+  * Signed distance from the baseline, which is what the timeline is really
+  * about. The noun is passed in rather than assumed: "vs metro" on the
+  * national map would name the wrong denominator. See lib/baseline.ts.
+  */
+export function formatRelative(index: number | null, noun = 'metro'): string {
   if (index == null) return '—';
   const delta = index - 100;
-  if (Math.abs(delta) < 0.5) return 'at metro average';
-  return `${delta > 0 ? '+' : ''}${delta.toFixed(0)} pts vs metro`;
+  if (Math.abs(delta) < 0.5) return `at ${noun} average`;
+  return `${delta > 0 ? '+' : ''}${delta.toFixed(0)} pts vs ${noun}`;
 }
 
 export function formatOrdinal(n: number | null): string {

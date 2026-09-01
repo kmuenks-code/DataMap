@@ -2,6 +2,8 @@
   "id": "columbus-oh",
   "label": "Greater Columbus, OH",
   "kind": "metro",
+  "default": true,
+  "parent": "us",
   "cbsa": "18140",
   "center": [-82.9988, 39.9612],
   "zoom": 9,

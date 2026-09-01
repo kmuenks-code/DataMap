@@ -68,6 +68,13 @@ async function relationshipFile(): Promise<string> {
  * would put a value on ground it does not describe.
  */
 export async function placeGeoidsForRegion(region: RegionDef): Promise<Set<string>> {
+  if (!region.state || !region.counties?.length) {
+    throw new Error(
+      `[places] region ${region.id} has no state/counties, so places cannot be ` +
+        'restricted by the county relationship file. A national or state region ' +
+        'needs a different restrictBy.',
+    );
+  }
   const geoids = parsePlaceCounty(
     await relationshipFile(),
     region.state,

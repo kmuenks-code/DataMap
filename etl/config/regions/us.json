@@ -1,0 +1,57 @@
+{
+  "id": "us",
+  "label": "United States",
+  "kind": "national",
+  "center": [-98.5795, 39.8283],
+  "zoom": 3,
+
+  "fitBounds": [-170, 18, -66, 60],
+  "_fitBounds_note": "MEASURED 2026-09-01 from the built geometry: Alaska's Aleutians cross the antimeridian, so Alaska's own longitude span is -178.9 to +179.8 and the collection's bounding box comes out 358.6 degrees wide. Fitting to it zooms out to the entire globe -- the map is unusable, and the box is not merely coarse but false. This box frames the lower 48 plus Hawaii and mainland Alaska. Insets (the Albers USA convention) are the real cartographic answer and remain unbuilt; see docs/geography-notes.md.",
+
+  "_comment_scope": "The 50 states + DC. No state/counties field: national levels are fetched with no in= scope at all (censusIn: 'us'), one request for the whole country per year.",
+
+  "geoLevels": [
+    {
+      "id": "county",
+      "label": "County",
+      "censusFor": "county:*",
+      "censusIn": "us",
+      "restrictBy": "us-states",
+      "vintage": 2020,
+      "tigerLayer": "county",
+      "simplify": "4%",
+      "boundaryVintages": [
+        { "vintage": 2010, "release": 2019 },
+        { "vintage": 2020, "release": 2021 },
+        { "vintage": 2022, "release": 2023 }
+      ],
+      "_vintage_note": "VERIFIED 2026-09-01 against the live API by listing counties per year. County boundary eras are NOT decadal, because they are set by individual state actions: Alaska split Valdez-Cordova (02261) into Chugach (02063) and Copper River (02066) in 2020, and Connecticut replaced its 8 counties with 9 PLANNING REGIONS in 2022, under entirely new GEOIDs (09001-09015 -> 09110-09190). That gives three eras -- 2009-2019, 2020-2021, 2022-2024 -- so this level declares its own vintages. Using the decadal default would join 2020-2021 Connecticut data to 2022 planning-region polygons and leave the whole state blank for two years.",
+      "_note": "3,143-3,144 counties depending on the year. Counties tile the country completely, so rate baselines may be pooled (tilesRegion defaults true) -- and they do sum to us:1."
+    },
+    {
+      "id": "state",
+      "label": "State",
+      "censusFor": "state:*",
+      "censusIn": "us",
+      "restrictBy": "us-states",
+      "vintage": 2020,
+      "default": true,
+      "tigerLayer": "state",
+      "simplify": "3%",
+      "_note": "VERIFIED 2026-09-01 against the live API: for=state:* returns 52 rows -- 50 states, DC, and Puerto Rico -- but the us:1 baseline EXCLUDES Puerto Rico. The gap is exactly PR's population in both 2009 (3,940,109) and 2024 (3,234,309). restrictBy drops the territories so the areas and the baseline describe the same country; PR belongs as its own region, not as an area measured against a baseline that omits it. See etl/src/sources/census/states.ts.",
+      "_simplify_note": "3% rather than the 12% used for metro levels: at national zoom the coastline is the whole picture, and Louisiana and the Chesapeake fall apart above roughly 5%."
+    }
+  ],
+
+  "years": {
+    "dataset": "acs/acs5",
+    "min": 2009,
+    "max": 2024,
+    "_note": "Same 2009-2024 ACS5 range as the metro regions. State geography carries none of the tract redraw problem -- state boundaries are fixed across all three boundary eras -- so this level has a genuinely continuous 16-year series with no crosswalk."
+  },
+
+  "baseline": {
+    "mode": "aggregate",
+    "_note": "Rates and counts pool from the 51 areas, which sum to us:1 exactly once territories are dropped (verified above). Medians still come from the published us:1 figure via baseline:'published' in metrics.json -- rule 1 applies identically at national scale."
+  }
+}

@@ -1,11 +1,13 @@
 import { useMetricData } from '../../data/useMetricData.ts';
 import { divergingBreaks, quantileBreaks, rampFor } from '../../lib/color/scales.ts';
 import { formatValue } from '../../lib/format.ts';
+import { baselineNoun, useBaselineTarget } from '../../lib/baseline.ts';
 import { useAppStore } from '../../state/useAppStore.ts';
 import { findMetric } from '../../data/types.ts';
 
 export function Legend() {
   const region = useAppStore((s) => s.region());
+  const target = useBaselineTarget();
   const metricId = useAppStore((s) => s.metricId);
   const viewMode = useAppStore((s) => s.viewMode);
   const hideUnreliable = useAppStore((s) => s.hideUnreliable);
@@ -30,7 +32,7 @@ export function Legend() {
   return (
     <div className="legend">
       <div className="legend-title">
-        {viewMode === 'index' ? '% of metro average' : metric.label}
+        {viewMode === 'index' ? `% of ${baselineNoun(target)} average` : metric.label}
       </div>
       <div className="ramp">
         {ramp.map((c, i) => (

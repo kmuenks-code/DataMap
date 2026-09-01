@@ -37,8 +37,16 @@ export interface MetricFile {
   index: (number | null)[][];
   /** Coefficient of variation, for reliability shading. Omitted if no MOE. */
   cv?: (number | null)[][];
+  /**
+   * Deliberately carries NO build timestamp.
+   *
+   * These files are committed, and a timestamp would rewrite every one of them
+   * on every run whether or not any number changed -- making `git diff` useless
+   * for the question it exists to answer ("did this refresh actually alter the
+   * data?") and adding history for nothing. The build time lives once, in the
+   * region manifest.
+   */
   meta: {
-    generatedAt: string;
     dataset: string;
     variables: string[];
     /** Set when boundaries differ from the current vintage; see crosswalk.ts. */

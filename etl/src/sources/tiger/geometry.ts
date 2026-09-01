@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 
 import type { GeoLevelDef, RegionDef } from '../../config.ts';
 import { placeGeoidsForRegion } from '../census/places.ts';
+import { FIRST_TERRITORY_FIPS } from '../census/states.ts';
 
 const run = promisify(execFile);
 const OUT = new URL('../../../../public/data/', import.meta.url);
@@ -70,15 +71,21 @@ async function buildOne(
   level: GeoLevelDef,
   vintage: number,
   allowedGeoids: Set<string> | null,
+  releaseOverride?: number,
 ): Promise<{ vintage: number; bytes: number; features: number } | null> {
-  const release = RELEASE_FOR_VINTAGE[vintage];
+  const release = releaseOverride ?? RELEASE_FOR_VINTAGE[vintage];
   if (!release) {
     console.log(`  skip    ${level.id} vintage ${vintage} (no GENZ release mapped)`);
     return null;
   }
 
-  const zip = join(CACHE, `cb_${release}_${region.state}_${level.tigerLayer}_500k.zip`);
-  await download(sourceUrl(release, region.state, level.tigerLayer), zip);
+  // TIGER publishes state files as `cb_<release>_<statefp>_<layer>` and the
+  // nation-wide ones as `cb_<release>_us_<layer>`. A national region has no
+  // state FIPS, and `us` is exactly the file it needs. A level may also force
+  // the national file -- counties are published ONLY there. See tigerScope.
+  const scope = level.tigerScope === 'us' ? 'us' : (region.state ?? 'us');
+  const zip = join(CACHE, `cb_${release}_${scope}_${level.tigerLayer}_500k.zip`);
+  await download(sourceUrl(release, scope, level.tigerLayer), zip);
 
   const work = await mkdtemp(join(tmpdir(), 'tiger-'));
   try {
@@ -95,10 +102,30 @@ async function buildOne(
     // LSAD, ALAND, AWATER. There is nothing to filter on but GEOID, which is
     // the same reason the data side needs the relationship file. Both sides use
     // ONE allowlist, so geometry and data can never disagree about membership.
-    const counties = region.counties.map((c) => c.fips);
+    // How the source file is cut down to the region, by level:
+    //   - an explicit allowlist (places), matched on GEOID;
+    //   - the territory rule (national), which is a numeric threshold rather
+    //     than a list precisely so no roster of FIPS codes can go stale --
+    //     it must agree with isUsState(), which filters the DATA side;
+    //   - otherwise the region's county list, matched on COUNTYFP.
+    const counties = region.counties?.map((c) => c.fips) ?? [];
     const filterExpr = allowedGeoids
       ? `${JSON.stringify([...allowedGeoids])}.indexOf(GEOID) > -1`
-      : `${JSON.stringify(counties)}.indexOf(COUNTYFP) > -1`;
+      : level.restrictBy === 'us-states'
+        ? // STATEFP rather than GEOID, so one expression serves every national
+          // level: a state's GEOID is 2 chars but a county's is 5, and
+          // `+GEOID < 60` retains nothing at county level (measured: 0 of 3,233).
+          `+STATEFP < ${FIRST_TERRITORY_FIPS}`
+        : counties.length > 0
+          ? `${JSON.stringify(counties)}.indexOf(COUNTYFP) > -1`
+          : scope === 'us' && region.state
+            ? // A state region reading the NATIONAL file (counties) must cut it
+              // down to its own state.
+              `STATEFP === ${JSON.stringify(region.state)}`
+            : // Otherwise the per-state file already IS the region and needs no
+              // clipping. Filtering on an empty county list would retain
+              // nothing at all, silently producing empty geometry.
+              null;
     const outDir = fileURLToPath(new URL(`regions/${region.id}/geometry/${level.id}/`, OUT));
     await mkdir(outDir, { recursive: true });
     const outFile = join(outDir, `${vintage}.topojson`);
@@ -109,8 +136,7 @@ async function buildOne(
         '--yes',
         'mapshaper',
         join(work, 'in.json'),
-        '-filter',
-        JSON.stringify(filterExpr),
+        ...(filterExpr ? ['-filter', JSON.stringify(filterExpr)] : []),
         '-each',
         JSON.stringify('geoid = GEOID, name = NAME'),
         '-filter-fields',
@@ -123,6 +149,9 @@ async function buildOne(
         '-o',
         outFile,
         'format=topojson',
+        // The file carries its own bounding box so the ETL can derive the
+        // region's map view from real geometry instead of a hand-typed centre.
+        'bbox',
         'quantization=1e5',
         `id-field=geoid`,
       ],
@@ -147,10 +176,18 @@ export async function buildGeometry(region: RegionDef, vintages: number[]): Prom
   for (const level of region.geoLevels) {
     if (level.enabled === false) continue;
     console.log(`\n--- geometry: ${level.id} ---`);
+    // ONE allowlist drives both the data and the geometry side, so the two can
+    // never disagree about which areas are in the region.
     const allowedGeoids =
       level.restrictBy === 'place-by-county' ? await placeGeoidsForRegion(region) : null;
-    for (const vintage of vintages) {
-      await buildOne(region, level, vintage, allowedGeoids);
+
+    // A level may declare its own eras when they are not decadal -- see the
+    // Connecticut and Alaska cases in config.ts.
+    const levelVintages = level.boundaryVintages?.map((v) => v.vintage) ?? vintages;
+    const releaseFor = new Map((level.boundaryVintages ?? []).map((v) => [v.vintage, v.release]));
+
+    for (const vintage of levelVintages) {
+      await buildOne(region, level, vintage, allowedGeoids, releaseFor.get(vintage));
     }
   }
   await readdir(CACHE).catch(() => []);

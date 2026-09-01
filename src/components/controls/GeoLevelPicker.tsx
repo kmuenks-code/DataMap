@@ -1,3 +1,4 @@
+import { baselineLabel, baselineNoun, useBaselineTarget } from '../../lib/baseline.ts';
 import { useAppStore } from '../../state/useAppStore.ts';
 
 export function GeoLevelPicker() {
@@ -23,7 +24,7 @@ export function GeoLevelPicker() {
         ))}
       </div>
       {/*
-        A level that does not cover the whole metro leaves real holes in the
+        A level that does not cover the whole region leaves real holes in the
         map. Without saying so, a reader takes blank ground for missing data
         rather than for land that belongs to no city.
       */}
@@ -33,16 +34,18 @@ export function GeoLevelPicker() {
 }
 
 export function ViewModeToggle() {
+  const target = useBaselineTarget();
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
+  const noun = baselineNoun(target);
   return (
     <div className="segmented">
       <button
         className={viewMode === 'index' ? 'active' : ''}
         onClick={() => setViewMode('index')}
-        title="Each area as a % of the metro average (metro = 100)"
+        title={`Each area as a % of the ${noun} average (${noun} = 100)`}
       >
-        vs Metro
+        vs {baselineLabel(target)}
       </button>
       <button
         className={viewMode === 'raw' ? 'active' : ''}

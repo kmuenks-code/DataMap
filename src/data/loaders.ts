@@ -1,4 +1,4 @@
-import type { Manifest, MetricFile } from './types.ts';
+import type { BaselineFile, Manifest, MetricFile, RegionSummary } from './types.ts';
 
 /**
  * All data is static JSON under the site's own origin -- no API keys, no CORS,
@@ -26,6 +26,24 @@ function loadJson<T>(path: string): Promise<T> {
 }
 
 export const loadManifest = () => loadJson<Manifest>('manifest.json');
+
+/**
+ * One region's layer > group > metric tree, fetched only once that region is
+ * actually opened. Splitting this out of the root manifest is what keeps
+ * startup cost flat as regions go from one to fifty-two: the boot fetch is the
+ * index alone, and a region's tree is paid for only if you look at it.
+ */
+export const loadRegion = (region: string) =>
+  loadJson<RegionSummary>(`regions/${region}/manifest.json`);
+
+/**
+ * One region's 100% line for every metric -- a few kilobytes.
+ *
+ * Fetched for an ANCESTOR region when the user asks to compare against it, so
+ * "vs the US" costs 2 KB rather than the ~900 KB of the US county file.
+ */
+export const loadBaselines = (region: string) =>
+  loadJson<BaselineFile>(`regions/${region}/baselines.json`);
 
 /**
  * Metric files are layer-namespaced, because two sources may both publish a

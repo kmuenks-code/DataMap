@@ -109,7 +109,7 @@ describe('mergeMetricFile', () => {
     baseline: [],
     values: [],
     index: [],
-    meta: { generatedAt: '', dataset: 'acs/acs5', variables: [] },
+    meta: { dataset: 'acs/acs5', variables: [] },
     ...over,
   });
 

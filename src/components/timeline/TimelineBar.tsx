@@ -2,11 +2,13 @@ import { useEffect, useMemo } from 'react';
 
 import { useMetricData, useTrend } from '../../data/useMetricData.ts';
 import { formatRelative, formatValue } from '../../lib/format.ts';
+import { baselineNoun, useBaselineTarget } from '../../lib/baseline.ts';
 import { useAppStore } from '../../state/useAppStore.ts';
 import { findMetric } from '../../data/types.ts';
 
 export function TimelineBar() {
   const region = useAppStore((s) => s.region());
+  const target = useBaselineTarget();
   const metricId = useAppStore((s) => s.metricId);
   const year = useAppStore((s) => s.year);
   const setYear = useAppStore((s) => s.setYear);
@@ -17,6 +19,7 @@ export function TimelineBar() {
   const { file } = useMetricData();
   const trend = useTrend(file, selectedGeoid);
   const metric = region && metricId ? findMetric(region, metricId) : undefined;
+  const noun = baselineNoun(target);
   const years = metric?.years ?? [];
 
   useEffect(() => {
@@ -47,9 +50,15 @@ export function TimelineBar() {
         </div>
 
         {trend ? (
-          <Sparkline trend={trend} year={year} name={selectedName ?? ''} unit={metric.unit} />
+          <Sparkline
+            trend={trend}
+            year={year}
+            name={selectedName ?? ''}
+            unit={metric.unit}
+            noun={noun}
+          />
         ) : (
-          <span className="muted hint">Click an area to see its trend vs the metro average</span>
+          <span className="muted hint">Click an area to see its trend vs the {noun} average</span>
         )}
       </div>
 
@@ -97,11 +106,14 @@ function Sparkline({
   year,
   name,
   unit,
+  noun,
 }: {
   trend: { year: number; index: number | null; value: number | null }[];
   year: number;
   name: string;
   unit: string;
+  /** What the 100 line is called here -- "metro", "state", "US". */
+  noun: string;
 }) {
   const w = 260;
   const h = 44;
@@ -149,11 +161,11 @@ function Sparkline({
       <div className="spark-label">
         <strong>{name}</strong>
         <span className={current && current.index >= 100 ? 'above' : 'below'}>
-          {formatRelative(current?.index ?? null)}
+          {formatRelative(current?.index ?? null, noun)}
         </span>
         <span className="muted">{formatValue(current?.value ?? null, unit)}</span>
       </div>
-      <svg width={w} height={h} role="img" aria-label={`${name} trend versus metro average`}>
+      <svg width={w} height={h} role="img" aria-label={`${name} trend versus ${noun} average`}>
         <line x1={0} x2={w} y1={baselineY} y2={baselineY} className="spark-base" />
         <path d={path} className="spark-line" />
         {dot && <circle cx={dot.cx} cy={dot.cy} r={3.5} className="spark-dot" />}

@@ -7,6 +7,8 @@
  *   npm run etl -- --region columbus-oh --metric median-household-income
  *   npm run etl -- --region columbus-oh --years 2019,2024
  *   npm run etl -- --region columbus-oh --geo county-subdivision
+ *   npm run etl -- --states                               # all 50 states + DC
+ *   npm run etl -- --states --geo county                  # one level, every state
  *
  * Writes to public/data/. Output IS committed to git -- it is the site's
  * database, and GitHub Pages serves it as static files.
@@ -23,8 +25,20 @@ const { values } = parseArgs({
     geo: { type: 'string', multiple: true },
     years: { type: 'string' },
     only: { type: 'string' }, // 'geometry' | 'metrics'
+    states: { type: 'boolean' }, // every state region, from config/states.json
   },
 });
+
+/**
+ * Regions to build. `--states` expands to all 51 rather than making the caller
+ * name them, and runs them SEQUENTIALLY: the ETL's rate limiter is per-process,
+ * so building them in parallel would just queue behind the same limiter while
+ * making failures harder to attribute.
+ */
+const { loadStates: listStates } = await import('./config.ts');
+const regionIds = values.states
+  ? (await listStates()).map((s) => s.id)
+  : [values.region!];
 
 const years = values.years
   ?.split(',')
@@ -33,26 +47,34 @@ const years = values.years
 
 const started = Date.now();
 
-if (values.only !== 'metrics') {
-  const { loadLayers, loadRegion } = await import('./config.ts');
-  const { buildGeometry } = await import('./sources/tiger/geometry.ts');
-  const { buildOverlays } = await import('./sources/arcgis/overlays.ts');
-  const region = await loadRegion(values.region!);
-  // One file per boundary vintage: tracts are redrawn each decade, so no single
-  // geometry file can serve 2009-2024. See sources/tiger/geometry.ts.
-  await buildGeometry(region, [2020, 2010]);
-  // Overlays are geometry too, but carry no data and no vintage -- see
-  // sources/arcgis/overlays.ts.
-  await buildOverlays(region, await loadLayers());
-}
+for (const [i, regionId] of regionIds.entries()) {
+  if (regionIds.length > 1) {
+    console.log(`
+########## ${regionId} (${i + 1}/${regionIds.length}) ##########`);
+  }
 
-if (values.only !== 'geometry') {
-  const { runPipeline } = await import('./pipeline.ts');
-  await runPipeline({
-    region: values.region!,
-    metrics: values.metric,
-    geoLevels: values.geo,
-    years,
-  });
+  if (values.only !== 'metrics') {
+    const { loadLayers, loadRegion } = await import('./config.ts');
+    const { buildGeometry } = await import('./sources/tiger/geometry.ts');
+    const { buildOverlays } = await import('./sources/arcgis/overlays.ts');
+    const region = await loadRegion(regionId);
+    // One file per boundary vintage: tracts are redrawn each decade, so no
+    // single geometry file can serve 2009-2024. A level may override this with
+    // its own eras -- counties do. See sources/tiger/geometry.ts.
+    await buildGeometry(region, [2020, 2010]);
+    // Overlays are geometry too, but carry no data and no vintage -- see
+    // sources/arcgis/overlays.ts.
+    await buildOverlays(region, await loadLayers());
+  }
+
+  if (values.only !== 'geometry') {
+    const { runPipeline } = await import('./pipeline.ts');
+    await runPipeline({
+      region: regionId,
+      metrics: values.metric,
+      geoLevels: values.geo,
+      years,
+    });
+  }
 }
 console.log(`done in ${((Date.now() - started) / 1000).toFixed(1)}s`);

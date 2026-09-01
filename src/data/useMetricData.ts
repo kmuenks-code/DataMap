@@ -4,7 +4,8 @@ import type { FeatureCollection, Geometry } from 'geojson';
 import type { Topology } from 'topojson-specification';
 
 import { loadGeometry, loadMetric } from './loaders.ts';
-import { geometryVintageFor, layerOf, type MetricFile } from './types.ts';
+import { geometryVintageFor, layerOf, type BaselineFile, type MetricFile } from './types.ts';
+import { useActiveBaselineRegionId } from '../lib/baseline.ts';
 import { rankAll } from '../lib/stats/ranking.ts';
 import { useAppStore } from '../state/useAppStore.ts';
 
@@ -52,6 +53,36 @@ export function geometryMatchesFile(
   return file.geoLevel === topo.level && vintage === topo.vintage;
 }
 
+/**
+ * The 100% line to divide by, per year, when the user has chosen to compare
+ * against an ancestor region instead of this one.
+ *
+ * Returns null when the choice cannot be honoured -- the ancestor's baselines
+ * have not arrived, or it does not publish this metric. Callers then fall back
+ * to the file's own precomputed index rather than rendering an unindexed map,
+ * because a silently mis-scaled choropleth is worse than a briefly stale one.
+ */
+export function baselineSeries(
+  baselines: BaselineFile | undefined,
+  metricId: string | null,
+): Map<number, number | null> | null {
+  const entry = metricId ? baselines?.metrics[metricId] : undefined;
+  if (!entry) return null;
+  return new Map(entry.years.map((y, i) => [y, entry.values[i] ?? null]));
+}
+
+/**
+ * The index is `100 * value / baseline`, recomputed rather than read.
+ *
+ * The ETL ships an index against the region's OWN baseline. Comparing the same
+ * areas with a different region means redoing that one division -- which is
+ * why an alternative baseline costs a 2 KB file and no rebuild.
+ */
+export function indexAgainst(value: number | null, baseline: number | null | undefined): number | null {
+  if (value == null || baseline == null || baseline === 0) return null;
+  return Math.round((value / baseline) * 1000) / 10;
+}
+
 export interface MapFeatureProps {
   geoid: string;
   name: string;
@@ -74,6 +105,12 @@ export interface MapFeatureProps {
 export function useMetricData() {
   const { regionId, geoLevelId, metricId, year } = useAppStore();
   const region = useAppStore((s) => s.region());
+  // The ancestor actually in effect, not merely requested -- so the map and
+  // the labels can never disagree about what 100 means. See baseline.ts.
+  const baselineRegionId = useActiveBaselineRegionId();
+  const baselineFile = useAppStore((s) =>
+    baselineRegionId ? s.baselines[baselineRegionId] : undefined,
+  );
 
   const [file, setFile] = useState<MetricFile | null>(null);
   /**
@@ -119,6 +156,13 @@ export function useMetricData() {
     };
   }, [regionId, geoLevelId, vintage]);
 
+  // Only an ancestor's baseline is an override; the region's own is already
+  // baked into file.index.
+  const override = useMemo(
+    () => (baselineRegionId ? baselineSeries(baselineFile, metricId) : null),
+    [baselineRegionId, baselineFile, metricId],
+  );
+
   const collection = useMemo<FeatureCollection<Geometry, MapFeatureProps> | null>(() => {
     if (!file || !topo || year == null) return null;
 
@@ -134,7 +178,12 @@ export function useMetricData() {
 
     // Vintage belongs in the key too: one level's data is joined to different
     // polygons either side of a decennial redraw.
-    return cacheDerived(`${file.region}/${file.geoLevel}/${topo.vintage}/${file.metric}/${year}`, () => {
+    // The baseline region belongs in the key: the same areas, year and
+    // polygons produce a DIFFERENT index depending on what 100 means.
+    const baselineKey = override ? (baselineRegionId ?? 'own') : 'own';
+    return cacheDerived(
+      `${file.region}/${file.geoLevel}/${topo.vintage}/${file.metric}/${year}/${baselineKey}`,
+      () => {
       const ranks = rankAll(file, yearIndex);
       const byGeoid = new Map(file.geoids.map((g, i) => [g, i]));
 
@@ -160,7 +209,9 @@ export function useMetricData() {
               geoid,
               name: file.names[i] ?? f.properties?.name ?? geoid,
               value: file.values[yearIndex]?.[i] ?? null,
-              index: file.index[yearIndex]?.[i] ?? null,
+              index: override
+                ? indexAgainst(file.values[yearIndex]?.[i] ?? null, override.get(year))
+                : (file.index[yearIndex]?.[i] ?? null),
               cv: file.cv?.[yearIndex]?.[i] ?? null,
               rank: rank?.rank ?? null,
               percentile: rank?.percentile ?? null,
@@ -170,23 +221,39 @@ export function useMetricData() {
         ];
       });
 
-      return { type: 'FeatureCollection' as const, features };
-    });
-  }, [file, topo, year, vintage]);
+        return { type: 'FeatureCollection' as const, features };
+      },
+    );
+  }, [file, topo, year, vintage, override, baselineRegionId]);
 
   return { file, collection, loading, error, vintage };
 }
 
-/** The selected area's full index series -- what the sparkline draws. */
+/**
+ * The selected area's full index series -- what the sparkline draws.
+ *
+ * Recomputed against the chosen baseline for every year, not just the one on
+ * screen: the whole point of the trend is the shape, and a line drawn against
+ * two different denominators would bend for the wrong reason.
+ */
 export function useTrend(file: MetricFile | null, geoid: string | null) {
+  const baselineRegionId = useActiveBaselineRegionId();
+  const baselineFile = useAppStore((s) =>
+    baselineRegionId ? s.baselines[baselineRegionId] : undefined,
+  );
+
   return useMemo(() => {
     if (!file || !geoid) return null;
     const i = file.geoids.indexOf(geoid);
     if (i === -1) return null;
-    return file.years.map((y, yi) => ({
-      year: y,
-      index: file.index[yi]?.[i] ?? null,
-      value: file.values[yi]?.[i] ?? null,
-    }));
-  }, [file, geoid]);
+    const override = baselineRegionId ? baselineSeries(baselineFile, file.metric) : null;
+    return file.years.map((y, yi) => {
+      const value = file.values[yi]?.[i] ?? null;
+      return {
+        year: y,
+        index: override ? indexAgainst(value, override.get(y)) : (file.index[yi]?.[i] ?? null),
+        value,
+      };
+    });
+  }, [file, geoid, baselineRegionId, baselineFile]);
 }

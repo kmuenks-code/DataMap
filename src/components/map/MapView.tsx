@@ -46,8 +46,12 @@ export function MapView() {
    * load. Instead both paths call the same apply(), which no-ops until the
    * source exists. Whichever finishes last paints, and it is idempotent.
    */
-  const pending = useRef({ collection, viewMode, hideUnreliable });
-  pending.current = { collection, viewMode, hideUnreliable };
+  // apply() is a stable callback with no deps -- it reads everything it needs
+  // through this ref so that re-rendering never re-registers map listeners.
+  // fitBounds rides along for the same reason: reading `region` from the
+  // closure would capture the null it held on the first render.
+  const pending = useRef({ collection, viewMode, hideUnreliable, fitBounds: region?.fitBounds });
+  pending.current = { collection, viewMode, hideUnreliable, fitBounds: region?.fitBounds };
 
   const pendingOverlays = useRef({ overlays, overlayData });
   pendingOverlays.current = { overlays, overlayData };
@@ -69,13 +73,26 @@ export function MapView() {
   const fitted = useRef<string | null>(null);
   /** Once the user pans or zooms, stop re-fitting: the view is theirs. */
   const userMoved = useRef(false);
+
+  /**
+   * Switching region is the one case where the user's view must be overridden.
+   * Their panning was of a different place -- keeping it would leave Columbus's
+   * viewport pointed at Ohio while the national map loads underneath, or the
+   * reverse. Both refs reset so the next collection fits from scratch.
+   */
+  const lastRegion = useRef<string | null>(null);
+  if (region && lastRegion.current !== region.id) {
+    lastRegion.current = region.id;
+    userMoved.current = false;
+    fitted.current = null;
+  }
   const lastBounds = useRef<[number, number, number, number] | null>(null);
 
   const apply = useCallback(() => {
     const m = map.current;
     if (!m) return;
     const src = m.getSource(SOURCE) as maplibregl.GeoJSONSource | undefined;
-    const { collection: fc, viewMode: mode, hideUnreliable: fade } = pending.current;
+    const { collection: fc, viewMode: mode, hideUnreliable: fade, fitBounds } = pending.current;
     if (!src || !fc) return;
 
     src.setData(fc as GeoJSON.FeatureCollection);
@@ -83,10 +100,16 @@ export function MapView() {
     // Fit to the data rather than trusting a hand-tuned center/zoom. The config
     // values cannot be right for every region, and this is what makes adding a
     // new city a config-only change.
+    //
+    // The exception is geometry that crosses the antimeridian, where the
+    // bounding box is not merely imperfect but false: Alaska's Aleutians run
+    // from -178.9 to +179.8, so the national collection measures 358.6 degrees
+    // wide and fitting it zooms out to the whole globe. A region may therefore
+    // declare fitBounds, which is trusted over the computed box.
     const key = `${fc.features.length}`;
     const usable = m.getContainer().clientHeight > 0;
     if (usable && fitted.current !== key && fc.features.length > 0) {
-      const b = bounds(fc);
+      const b = fitBounds ?? bounds(fc);
       if (b) {
         lastBounds.current = b;
         fitToBounds(m, b);

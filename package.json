@@ -14,6 +14,8 @@
     "test": "vitest run",
     "etl": "tsx etl/src/index.ts",
     "etl:columbus": "tsx etl/src/index.ts --region columbus-oh",
+    "etl:us": "tsx etl/src/index.ts --region us",
+    "etl:states": "tsx etl/src/index.ts --states",
     "etl:latest": "tsx etl/src/index.ts --region columbus-oh --years 2024"
   },
   "dependencies": {

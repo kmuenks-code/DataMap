@@ -60,3 +60,42 @@ export function applyCrosswalk(
 ): Map<string, number | null> {
   throw new Error('Not implemented -- see option C above. Ship option A first.');
 }
+
+/**
+ * COUNTY GEOID RENAMES -- areas that changed code without changing ground.
+ *
+ * Distinct from the tract problem above, and much smaller: no interpolation is
+ * involved, because the polygon is the same polygon. A county is simply
+ * published under a new GEOID from some year onward, so a naive build produces
+ * two half-length series for one place and leaves the older one joined to no
+ * polygon at all (the TIGER release only carries the new code).
+ *
+ * VERIFIED 2026-09-01 from the built data -- population is continuous across
+ * each boundary, which is what distinguishes a rename from a merge:
+ *
+ *   02270 Wade Hampton Census Area -> 02158 Kusilvak Census Area  (2015)
+ *      7,778 in 2014  ->  7,914 in 2015
+ *   46113 Shannon County -> 46102 Oglala Lakota County            (2015)
+ *     14,005 in 2014  -> 14,153 in 2015
+ *
+ * NOT included, deliberately: 51515 Bedford city -> 51019 Bedford County
+ * (2014). That one is a genuine MERGE -- an independent city dissolving into
+ * the surrounding county, whose population jumps 69,175 -> 75,607 the same
+ * year, absorbing the city's ~6,400. Aliasing it would attribute a small
+ * city's median to a county eleven times its size. It stays a real gap: the
+ * city has data for 2009-2013 and no polygon in any shipped vintage.
+ */
+const COUNTY_RENAMES: Record<string, string> = {
+  '02270': '02158',
+  '46113': '46102',
+};
+
+/**
+ * The geoid an area is published under TODAY, for one that was renamed.
+ *
+ * Applied on the way in so a metric file carries one continuous series per
+ * place rather than two truncated ones under two codes.
+ */
+export function canonicalGeoid(geoid: string): string {
+  return COUNTY_RENAMES[geoid] ?? geoid;
+}

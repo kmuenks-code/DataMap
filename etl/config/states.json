@@ -1,0 +1,260 @@
+{
+  "_doc": "The 50 states + DC, GENERATED from the live API (for=state:*, 2024 ACS5) rather than typed, so no FIPS code or name is transcribed by hand. Territories are excluded for the same reason the national region excludes them -- see etl/src/sources/census/states.ts. Each entry expands into a full region via regions/_state-template.json, so a change to what a state region contains is ONE edit, not fifty-one.",
+  "states": [
+    {
+      "id": "alabama",
+      "label": "Alabama",
+      "fips": "01"
+    },
+    {
+      "id": "alaska",
+      "label": "Alaska",
+      "fips": "02"
+    },
+    {
+      "id": "arizona",
+      "label": "Arizona",
+      "fips": "04"
+    },
+    {
+      "id": "arkansas",
+      "label": "Arkansas",
+      "fips": "05"
+    },
+    {
+      "id": "california",
+      "label": "California",
+      "fips": "06"
+    },
+    {
+      "id": "colorado",
+      "label": "Colorado",
+      "fips": "08"
+    },
+    {
+      "id": "connecticut",
+      "label": "Connecticut",
+      "fips": "09"
+    },
+    {
+      "id": "delaware",
+      "label": "Delaware",
+      "fips": "10"
+    },
+    {
+      "id": "district-of-columbia",
+      "label": "District of Columbia",
+      "fips": "11"
+    },
+    {
+      "id": "florida",
+      "label": "Florida",
+      "fips": "12"
+    },
+    {
+      "id": "georgia",
+      "label": "Georgia",
+      "fips": "13"
+    },
+    {
+      "id": "hawaii",
+      "label": "Hawaii",
+      "fips": "15"
+    },
+    {
+      "id": "idaho",
+      "label": "Idaho",
+      "fips": "16"
+    },
+    {
+      "id": "illinois",
+      "label": "Illinois",
+      "fips": "17"
+    },
+    {
+      "id": "indiana",
+      "label": "Indiana",
+      "fips": "18"
+    },
+    {
+      "id": "iowa",
+      "label": "Iowa",
+      "fips": "19"
+    },
+    {
+      "id": "kansas",
+      "label": "Kansas",
+      "fips": "20"
+    },
+    {
+      "id": "kentucky",
+      "label": "Kentucky",
+      "fips": "21"
+    },
+    {
+      "id": "louisiana",
+      "label": "Louisiana",
+      "fips": "22"
+    },
+    {
+      "id": "maine",
+      "label": "Maine",
+      "fips": "23"
+    },
+    {
+      "id": "maryland",
+      "label": "Maryland",
+      "fips": "24"
+    },
+    {
+      "id": "massachusetts",
+      "label": "Massachusetts",
+      "fips": "25"
+    },
+    {
+      "id": "michigan",
+      "label": "Michigan",
+      "fips": "26"
+    },
+    {
+      "id": "minnesota",
+      "label": "Minnesota",
+      "fips": "27"
+    },
+    {
+      "id": "mississippi",
+      "label": "Mississippi",
+      "fips": "28"
+    },
+    {
+      "id": "missouri",
+      "label": "Missouri",
+      "fips": "29"
+    },
+    {
+      "id": "montana",
+      "label": "Montana",
+      "fips": "30"
+    },
+    {
+      "id": "nebraska",
+      "label": "Nebraska",
+      "fips": "31"
+    },
+    {
+      "id": "nevada",
+      "label": "Nevada",
+      "fips": "32"
+    },
+    {
+      "id": "new-hampshire",
+      "label": "New Hampshire",
+      "fips": "33"
+    },
+    {
+      "id": "new-jersey",
+      "label": "New Jersey",
+      "fips": "34"
+    },
+    {
+      "id": "new-mexico",
+      "label": "New Mexico",
+      "fips": "35"
+    },
+    {
+      "id": "new-york",
+      "label": "New York",
+      "fips": "36"
+    },
+    {
+      "id": "north-carolina",
+      "label": "North Carolina",
+      "fips": "37"
+    },
+    {
+      "id": "north-dakota",
+      "label": "North Dakota",
+      "fips": "38"
+    },
+    {
+      "id": "ohio",
+      "label": "Ohio",
+      "fips": "39"
+    },
+    {
+      "id": "oklahoma",
+      "label": "Oklahoma",
+      "fips": "40"
+    },
+    {
+      "id": "oregon",
+      "label": "Oregon",
+      "fips": "41"
+    },
+    {
+      "id": "pennsylvania",
+      "label": "Pennsylvania",
+      "fips": "42"
+    },
+    {
+      "id": "rhode-island",
+      "label": "Rhode Island",
+      "fips": "44"
+    },
+    {
+      "id": "south-carolina",
+      "label": "South Carolina",
+      "fips": "45"
+    },
+    {
+      "id": "south-dakota",
+      "label": "South Dakota",
+      "fips": "46"
+    },
+    {
+      "id": "tennessee",
+      "label": "Tennessee",
+      "fips": "47"
+    },
+    {
+      "id": "texas",
+      "label": "Texas",
+      "fips": "48"
+    },
+    {
+      "id": "utah",
+      "label": "Utah",
+      "fips": "49"
+    },
+    {
+      "id": "vermont",
+      "label": "Vermont",
+      "fips": "50"
+    },
+    {
+      "id": "virginia",
+      "label": "Virginia",
+      "fips": "51"
+    },
+    {
+      "id": "washington",
+      "label": "Washington",
+      "fips": "53"
+    },
+    {
+      "id": "west-virginia",
+      "label": "West Virginia",
+      "fips": "54"
+    },
+    {
+      "id": "wisconsin",
+      "label": "Wisconsin",
+      "fips": "55"
+    },
+    {
+      "id": "wyoming",
+      "label": "Wyoming",
+      "fips": "56"
+    }
+  ]
+}

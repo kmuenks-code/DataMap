@@ -15,6 +15,29 @@ GitHub Pages soft-limits repos to ~1 GB and recommends sites under 1 GB, with a 
 - Regenerate data only when a new ACS vintage lands (once a year), not on a timer.
 - Or build data in CI and deploy it as an artifact without committing it. Costs reproducibility; not worth it yet.
 
+## Building the state regions
+
+Measured on Ohio, cold: **73 s** of geometry (3 levels x 2-3 vintages) and **460 s** of
+metrics (3 levels x 16 years, statewide calls), so roughly **9 minutes per state**.
+
+That has two consequences.
+
+**`npm run etl:states` takes ~7.5 hours cold.** It is a once-ever cost -- the response
+cache makes every rebuild after it free -- but it is not something to run casually, and
+it should be run once and committed rather than repeated.
+
+**A single GitHub Actions job cannot do it.** Jobs are capped at 6 hours. Building the
+states in CI needs a matrix over states (or chunks of ~10), each job restoring and saving
+the ETL cache. The existing `refresh-data.yml` is fine as-is for the incremental case,
+because a refresh with a warm cache fetches only a newly published year.
+
+Data volume, measured: Ohio's output is **7.6 MB** (7 MB metrics, 2 MB geometry). Ohio is
+on the large side -- 1,622 county subdivisions and 1,283 places -- so 51 states lands
+around **300-390 MB raw, roughly 90-115 MB in git**. That is well inside GitHub's 1 GB
+soft limit, and per the measurement above an annual refresh adds only a few MB, because
+git delta-compresses near-identical JSON. Tracts are excluded from that figure and are
+disabled by default; see docs/geography-notes.md.
+
 ## Keeping identity separate
 
 The Census key is a build-time secret and never ships — that part is handled by architecture. The identity exposure is different and worth setting up correctly **before the first push**, because git history is very hard to scrub later.

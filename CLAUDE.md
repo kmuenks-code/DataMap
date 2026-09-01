@@ -17,25 +17,28 @@ If a change would make the browser call an external API, it is the wrong change.
 
 ```
 etl/            Build-time data pipeline (Node + tsx). Never imported by src/.
-  config/       layers.json + metrics.json + regions/*.json -- the registries
+  config/       layers.json + metrics.json + regions/*.json + states.json -- the registries
+                regions/_state-template.json expands into all 51 state regions
   src/sources/  census/ (ACS), tiger/ (boundaries); future: osm/, noaa/
   src/transform/ normalize.ts (index math), crosswalk.ts, pack.ts (output format)
   .cache/       Raw upstream responses, content-addressed. Gitignored.
 public/data/    ETL OUTPUT. Committed. This is the site's database.
-  manifest.json          Fetched at startup; lists regions/metrics/years
+  manifest.json          Root INDEX: which regions exist, and nothing else
+  regions/<id>/manifest.json  That region's layer > group > metric tree
+  regions/<id>/baselines.json That region's 100% line per metric (~2 KB)
   regions/<id>/geometry/<level>/<boundaryVintage>.topojson
   regions/<id>/metrics/<level>/<layer>/<metric>.json
 src/            React + TS + MapLibre app
   data/         loaders.ts, types.ts (ETL<->app contract), useMetricData.ts (the join)
   lib/          color scales, classification, ranking, formatting
-  state/        zustand store (region, geoLevel, metric, year, viewMode)
+  state/        zustand store (region, baselineRegion, geoLevel, metric, year, viewMode)
 docs/           layers.md, data-sources.md, geography-notes.md, deployment.md
 ```
 
 ## Data taxonomy: Layer > Group > Metric
 
-Built from `layers.json` + `metrics.json` into a tree inside `manifest.json`, which IS
-the app's navigation model. Designed so hundreds of metrics stay navigable. Full detail
+Built from `layers.json` + `metrics.json` into a tree inside `regions/<id>/manifest.json`,
+which IS the app's navigation model. Designed so hundreds of metrics stay navigable. Full detail
 in `docs/layers.md`; the one distinction to keep straight:
 
 - **Metric layers** color the map. **Mutually exclusive** -- a polygon has one fill, so
@@ -55,8 +58,17 @@ published CBSA rather than being pooled from what's on screen). See `docs/layers
 ## Core concept: the relative index
 
 ```
-index = 100 * areaValue / metroValue     (same year, both sides)
+index = 100 * areaValue / baselineValue     (same year, both sides)
 ```
+
+**Scope and baseline are separate.** The areas drawn come from the selected region;
+what counts as 100 comes from that region OR any ancestor it declares via `parent`.
+Columbus townships can be read against the metro or against the country without a
+rebuild, because an ancestor's baselines are a 2 KB file and the index is one division.
+The app recomputes it (`indexAgainst()`); the ETL ships only the region's own.
+Measured example -- Bexley vs metro 179 (2015) -> 193 (2024), but vs US 186 -> 196:
+it pulled away from its metro faster than from the country, which is a different
+sentence than either number alone.
 
 The metro is 100 in every year by construction. An area drifting 130 → 118 lost ground
 even if its raw dollars rose. Inflation and metro-wide shocks cancel out — the raw-dollar
@@ -104,9 +116,15 @@ These are correctness traps, not style preferences. Details in `docs/data-source
 - **A data domain** (politics, weather, transit) → one entry in `etl/config/layers.json`
   plus a fetcher under `etl/src/sources/` emitting the standard `MetricFile`. No app code.
 - **A city** → one file in `etl/config/regions/`. No app code.
+- **A state** → nothing. All 51 expand from `regions/_state-template.json` + `states.json`
+  (itself generated from the API). Editing what a state region contains is ONE edit, not 51.
+  An explicit `regions/<state>.json` overrides the template -- `alaska.json` exists solely
+  because the Aleutians cross the antimeridian.
 - **An overlay** (neighborhoods, districts) → one `layers.json` entry with a `source`
   block pointing at an ArcGIS endpoint. No app code. Only the name field ships.
-- **The 50-state view** → a region with `kind: "state"`, baseline = US. No app code.
+- **The 50-state view** → BUILT. `etl/config/regions/us.json`, `kind: "national"`,
+  baseline = `us:1`, one geo level (state). Region kind now also picks the baseline
+  geography (`baselineForClause()`) and the word the UI uses for it (`src/lib/baseline.ts`).
 - **A new data source** → a new dir under `etl/src/sources/` emitting the same `MetricFile`
   shape. The app never learns where a metric came from.
 
@@ -118,6 +136,9 @@ fix that instead.
 ```bash
 npm run dev                 # local site
 npm run etl:columbus        # rebuild all Columbus data (cached; ~0 requests on re-run)
+npm run etl:us              # rebuild the national (state + county) region
+npm run etl:states          # all 50 states + DC (~7.5 h cold; see docs/deployment.md)
+npm run etl -- --region ohio
 npm run etl -- --region columbus-oh --metric median-household-income
 npm run build && npm run preview
 ```
@@ -127,9 +148,11 @@ npm run build && npm run preview
 
 ## Status
 
-**Working:** the full ETL runs end to end, with 26 passing tests over the transform core
-and the place/geoid logic. `public/data/` holds 9 metrics x 16 years (2009-2024) x 3 geo
-levels, plus one overlay. 2.6 MB total.
+**Working:** the full ETL runs end to end, with 36 passing tests over the transform core,
+the place/geoid logic and the national territory rule. `public/data/` holds TWO regions:
+Columbus (9 metrics x 16 years x 3 geo levels, plus one overlay, 2.6 MB) and the US
+(9 metrics x 16 years at state AND county level, 9.2 MB). 12 MB total -- the county
+metric files are ~900 KB each raw, ~310 KB gzipped.
 Cold build = 404 requests / ~4.5 min; any rebuild after that = 0 requests / 1.2s.
 Partial runs (`--metric`, `--years`, `--geo`) splice into existing files rather than
 truncating them, so incremental refresh is the normal path.
@@ -137,9 +160,36 @@ Geometry is built too: TopoJSON per boundary vintage, joins verified against the
 **The app runs**: choropleth, layer/group/metric picker, geography switch, view-mode
 toggle, year scrubber with play, per-area trend sparkline, rank/percentile detail panel,
 CV-based fading, and overlay outlines with labels. Verified in-browser end to end.
+Region switching, and a baseline picker that repins 100% to any ancestor region
+(metro -> state -> nation), verified: an Ohio township reads 93% of state and 82% of US.
 **Not yet implemented:** URL state/deep links, and the tract-era crosswalk.
 
-Verified facts (2026-08-29, live API) that override anything ACS docs may suggest:
+Verified facts (2026-08-29 / 2026-09-01, live API) that override anything ACS docs may suggest:
+- **Statewide fetches work for tract and county subdivision.** `for=tract:*&in=state:39`
+  and `for=county subdivision:*&in=state:39` both succeed for every year 2009-2024
+  (retested 2026-09-01). An earlier note claimed a bare `in=state:XX` was rejected for
+  county-nested levels; it is not. This is what makes 51 states cost ~2,500 requests
+  rather than ~50,000. NOTE: geoids must still be composed from the geography's own
+  hierarchy (`GEOID_PARTS`), not from how it was fetched -- a statewide-fetched tract is
+  still state+county+tract.
+- **TIGER publishes counties ONLY in the national file.** `cb_2019_39_county_500k.zip` is
+  a 404; tracts, county subdivisions and places all have per-state files. Hence
+  `tigerScope` on a geo level.
+- **`for=state:*` returns 52 rows; the `us:1` baseline covers only 51.** Puerto Rico is
+  in the first and not the second, and the gap is exact to the person (2009: 3,940,109;
+  2024: 3,234,309). Territories are therefore dropped from the national region, so its
+  areas and its baseline describe the same country -- with them dropped, the aggregated
+  poverty rate equals published `us:1` to three decimals. PR belongs as its own region.
+  See `etl/src/sources/census/states.ts`.
+- **County boundary eras are NOT decadal: 2009-2019, 2020-2021, 2022-2024.** Alaska split
+  Valdez-Cordova in 2020; Connecticut replaced its 8 counties with 9 planning regions in
+  2022 under new GEOIDs. A geo level can declare its own `boundaryVintages`; the county
+  level does. Two further counties were RENAMED in 2015 (folded by `canonicalGeoid()`),
+  while Bedford city VA is a genuine MERGE and is deliberately left as a gap.
+- **National geometry cannot be fitted to its own bounding box.** Alaska's Aleutians
+  cross the antimeridian, so Alaska spans -178.9 to +179.8 and the collection measures
+  358.6 degrees wide; fitting it zooms out to the whole globe. A region may declare
+  `fitBounds` for this; AK/HI insets are not built.
 - ACS5 is published for **2009-2024**; 2025 returns 404.
 - Default geo level is **county-subdivision** (townships/cities), chosen for timeline
   integrity; tract is available and better-looking but has a broken pre-2020 series.

@@ -1,10 +1,12 @@
 import { useMetricData } from '../../data/useMetricData.ts';
 import { formatIndex, formatOrdinal, formatRelative, formatValue } from '../../lib/format.ts';
+import { baselineNoun, useBaselineTarget } from '../../lib/baseline.ts';
 import { useAppStore } from '../../state/useAppStore.ts';
 import { findMetric } from '../../data/types.ts';
 
 export function AreaDetailPanel() {
   const region = useAppStore((s) => s.region());
+  const target = useBaselineTarget();
   const metricId = useAppStore((s) => s.metricId);
   const hovered = useAppStore((s) => s.hoveredGeoid);
   const selected = useAppStore((s) => s.selectedGeoid);
@@ -15,6 +17,7 @@ export function AreaDetailPanel() {
   const f = collection?.features.find((x) => x.properties.geoid === geoid);
   if (!f || !metric) return null;
 
+  const noun = baselineNoun(target);
   const p = f.properties;
   const imprecise = p.cv != null && p.cv > 0.15;
 
@@ -25,7 +28,7 @@ export function AreaDetailPanel() {
 
       <div className="detail-value">{formatValue(p.value, metric.unit)}</div>
       <div className={`detail-index ${p.index != null && p.index >= 100 ? 'above' : 'below'}`}>
-        {formatIndex(p.index)} of metro · {formatRelative(p.index)}
+        {formatIndex(p.index)} of {noun} · {formatRelative(p.index, noun)}
       </div>
 
       {p.rank != null && (

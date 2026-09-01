@@ -1,0 +1,347 @@
+{
+  "schema": 3,
+  "generatedAt": "2026-09-01T16:28:29.694Z",
+  "id": "ohio",
+  "label": "Ohio",
+  "kind": "state",
+  "center": [
+    -82.6696,
+    40.1912
+  ],
+  "zoom": 6,
+  "parent": "us",
+  "geoLevels": [
+    {
+      "id": "county",
+      "label": "County",
+      "default": true,
+      "areaCount": 88,
+      "geometryVintages": [
+        2010,
+        2020,
+        2022
+      ]
+    },
+    {
+      "id": "county-subdivision",
+      "label": "Township / City",
+      "areaCount": 1622,
+      "geometryVintages": [
+        2010,
+        2020
+      ]
+    },
+    {
+      "id": "place",
+      "label": "City / Town",
+      "areaCount": 1283,
+      "geometryVintages": [
+        2010,
+        2020
+      ],
+      "tilesRegion": false,
+      "note": "Municipal limits. Much of every state is unincorporated and belongs to no place, so blank ground here is a real gap rather than missing data."
+    }
+  ],
+  "layers": [
+    {
+      "id": "census-acs",
+      "label": "Census & Demographics",
+      "kind": "metric",
+      "description": "American Community Survey 5-year estimates. Annual, small-area, survey-based -- every value carries a margin of error.",
+      "attribution": "US Census Bureau, American Community Survey 5-Year Estimates",
+      "groups": [
+        {
+          "id": "economy",
+          "label": "Economy",
+          "metrics": [
+            {
+              "id": "median-household-income",
+              "label": "Median Household Income",
+              "unit": "usd",
+              "kind": "median",
+              "higherIsBetter": true,
+              "description": "Median income of all households, in inflation-unadjusted dollars of the survey year. The relative index cancels inflation; the raw value does not.",
+              "years": [
+                2009,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            },
+            {
+              "id": "poverty-rate",
+              "label": "Poverty Rate",
+              "unit": "percent",
+              "kind": "rate",
+              "higherIsBetter": false,
+              "years": [
+                2009,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            },
+            {
+              "id": "unemployment-rate",
+              "label": "Unemployment Rate",
+              "unit": "percent",
+              "kind": "rate",
+              "higherIsBetter": false,
+              "years": [
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "housing",
+          "label": "Housing",
+          "metrics": [
+            {
+              "id": "median-gross-rent",
+              "label": "Median Gross Rent",
+              "unit": "usd-monthly",
+              "kind": "median",
+              "higherIsBetter": null,
+              "years": [
+                2009,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            },
+            {
+              "id": "median-home-value",
+              "label": "Median Home Value",
+              "unit": "usd",
+              "kind": "median",
+              "higherIsBetter": null,
+              "years": [
+                2009,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            },
+            {
+              "id": "owner-occupancy",
+              "label": "Owner-Occupied Housing",
+              "unit": "percent",
+              "kind": "rate",
+              "higherIsBetter": null,
+              "years": [
+                2009,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "demographics",
+          "label": "Demographics",
+          "metrics": [
+            {
+              "id": "median-age",
+              "label": "Median Age",
+              "unit": "years",
+              "kind": "median",
+              "higherIsBetter": null,
+              "years": [
+                2009,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            },
+            {
+              "id": "population",
+              "label": "Total Population",
+              "unit": "people",
+              "kind": "count",
+              "higherIsBetter": null,
+              "years": [
+                2009,
+                2010,
+                2011,
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "education",
+          "label": "Education",
+          "metrics": [
+            {
+              "id": "bachelors-or-higher",
+              "label": "Bachelor's Degree or Higher",
+              "unit": "percent",
+              "kind": "rate",
+              "higherIsBetter": true,
+              "years": [
+                2012,
+                2013,
+                2014,
+                2015,
+                2016,
+                2017,
+                2018,
+                2019,
+                2020,
+                2021,
+                2022,
+                2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "county-subdivision",
+                "place"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

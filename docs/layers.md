@@ -1,6 +1,6 @@
 # Data Layers
 
-The taxonomy is three levels: **Layer → Group → Metric**. It exists so the UI stays navigable as the metric count grows from nine into the hundreds. The tree is computed at build time and shipped inside `manifest.json`, so the client does no work to render the picker.
+The taxonomy is three levels: **Layer → Group → Metric**. It exists so the UI stays navigable as the metric count grows from nine into the hundreds. The tree is computed at build time and shipped inside `regions/<id>/manifest.json`, so the client does no work to render the picker.
 
 ```
 Census & Demographics        <- layer   (a data domain, tied to one provider)

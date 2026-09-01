@@ -1,0 +1,65 @@
+{
+  "_doc": "Template for the 50 states + DC. NOT a region itself -- the leading underscore keeps it out of the region namespace. Expanded per state by loadRegion(), with id/label/state filled from states.json. Edit here to change every state region at once.",
+
+  "kind": "state",
+  "parent": "us",
+
+  "_baseline_note": "baselineForClause() maps kind 'state' to for=state:XX, so medians come from the state's own published figure and never from averaging (rule 1). Rates aggregate from the areas, which tile the state at every level except place.",
+
+  "_scope_note": "Every level here is fetched with ONE statewide call (censusIn: 'state'). VERIFIED 2026-09-01 against the live API for 2009-2024: `for=tract:*&in=state:39` and `for=county subdivision:*&in=state:39` both succeed. An earlier note in config.ts claimed county-nested levels required one call per county; that is what would have made 51 states cost ~50,000 requests instead of ~2,500.",
+
+  "geoLevels": [
+    {
+      "id": "county",
+      "label": "County",
+      "censusFor": "county:*",
+      "censusIn": "state",
+      "default": true,
+      "vintage": 2020,
+      "tigerLayer": "county",
+      "tigerScope": "us",
+      "simplify": "6%",
+      "boundaryVintages": [
+        { "vintage": 2010, "release": 2019 },
+        { "vintage": 2020, "release": 2021 },
+        { "vintage": 2022, "release": 2023 }
+      ],
+      "_note": "DEFAULT. Tiles the state and is stable across the whole range, so the timeline lives here -- the same reasoning that put Columbus on county subdivisions. The three vintages are the Alaska (2020) and Connecticut (2022) boundary eras; see docs/geography-notes.md."
+    },
+    {
+      "id": "county-subdivision",
+      "label": "Township / City",
+      "censusFor": "county subdivision:*",
+      "censusIn": "state",
+      "vintage": 2020,
+      "tigerLayer": "cousub",
+      "simplify": "8%",
+      "_note": "Minor civil divisions in the 29 MCD states; census county divisions elsewhere. Tiles the state either way."
+    },
+    {
+      "id": "place",
+      "label": "City / Town",
+      "censusFor": "place:*",
+      "censusIn": "state",
+      "tilesRegion": false,
+      "vintage": 2020,
+      "tigerLayer": "place",
+      "simplify": "8%",
+      "note": "Municipal limits. Much of every state is unincorporated and belongs to no place, so blank ground here is a real gap rather than missing data.",
+      "_note": "tilesRegion false is load-bearing: rule 9 forbids pooling a rate baseline over a level that leaves population out. Rates fall back to the published state figure."
+    },
+    {
+      "id": "tract",
+      "label": "Census Tract",
+      "censusFor": "tract:*",
+      "censusIn": "state",
+      "vintage": 2020,
+      "tigerLayer": "tract",
+      "simplify": "6%",
+      "enabled": false,
+      "_note": "DISABLED by default. Tracts are redrawn every decade across THREE eras (2009 / 2010-2019 / 2020-2024) and only ~43% have a complete series, so the timeline is broken here until the crosswalk exists -- rule 3. Enable per state deliberately, knowing that; the geometry and data both build correctly, it is the SERIES that is not continuous."
+    }
+  ],
+
+  "years": { "dataset": "acs/acs5", "min": 2009, "max": 2024 }
+}
