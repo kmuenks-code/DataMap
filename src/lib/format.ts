@@ -44,3 +44,29 @@ export function formatOrdinal(n: number | null): string {
   const v = n % 100;
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]!);
 }
+
+/**
+ * A signed change in a metric's own units, for the leaderboard's delta mode.
+ *
+ * Always signed, including a leading '+': the whole point of the column is
+ * direction, and an unsigned "4,200" next to a signed "-1,900" reads as a
+ * formatting slip rather than growth. Zero is written as "0" with no sign.
+ */
+export function formatDelta(value: number | null, unit: string): string {
+  if (value == null) return '—';
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  return `${sign}${formatValue(Math.abs(value), unit)}`;
+}
+
+/**
+ * A signed change in INDEX POINTS -- "+14 pts" -- which is what a move looks
+ * like when the baseline is pinned at 100.
+ *
+ * Points, not percent: 179 -> 193 is +14 points and +7.8%, and calling it a
+ * percentage of a percentage is how index charts get misread.
+ */
+export function formatIndexDelta(value: number | null): string {
+  if (value == null) return '—';
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  return `${sign}${Math.abs(value).toFixed(1)} pts`;
+}

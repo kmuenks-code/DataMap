@@ -148,8 +148,8 @@ npm run build && npm run preview
 
 ## Status
 
-**Working:** the full ETL runs end to end, with 36 passing tests over the transform core,
-the place/geoid logic and the national territory rule. `public/data/` holds TWO regions:
+**Working:** the full ETL runs end to end, with 54 passing tests over the transform core,
+the place/geoid logic, the national territory rule and the leaderboard. `public/data/` holds TWO regions:
 Columbus (9 metrics x 16 years x 3 geo levels, plus one overlay, 2.6 MB) and the US
 (9 metrics x 16 years at state AND county level, 9.2 MB). 12 MB total -- the county
 metric files are ~900 KB each raw, ~310 KB gzipped.
@@ -160,6 +160,13 @@ Geometry is built too: TopoJSON per boundary vintage, joins verified against the
 **The app runs**: choropleth, layer/group/metric picker, geography switch, view-mode
 toggle, year scrubber with play, per-area trend sparkline, rank/percentile detail panel,
 CV-based fading, and overlay outlines with labels. Verified in-browser end to end.
+A **Top 10 rail** ranks the current selection -- region x geo level x metric x year x
+view mode all come from the same store the map reads, so it needs no scope of its own.
+It adds two questions: which end (Highest/Lowest, where "highest" is literally the
+largest number, matching rankAll) and whether to rank the LEVEL in the selected year or
+the CHANGE across the metric's full span. Change is measured in whatever the view mode
+is showing -- index points when the map is indexed, raw units when it is not -- so the
+list and the fill never mean different things.
 Region switching, and a baseline picker that repins 100% to any ancestor region
 (metro -> state -> nation), verified: an Ohio township reads 93% of state and 82% of US.
 **Not yet implemented:** URL state/deep links, and the tract-era crosswalk.
@@ -220,8 +227,14 @@ Verified facts (2026-08-29 / 2026-09-01, live API) that override anything ACS do
 
 ## Open questions
 
-- How to handle small-population noise: CV shading only, a population floor, or both?
-  Nothing is decided; see rule 5.
+- How to handle small-population noise **on the map**: CV shading only, a population
+  floor, or both? Still undecided; see rule 5. The Top 10 rail has settled its own
+  case -- it EXCLUDES areas over the CV threshold by default, states the count, and lets
+  the reader put them back. Measured: with them included, the top mover by index change
+  in Columbus is Thompson township at +124.4 pts, which is rule 5's own example of noise;
+  excluded, 84 of 173 county subdivisions drop out and the list becomes real places. No
+  population floor was added -- CV already encodes small-sample error, and a floor would
+  delete most of the region's places outright.
 - Pre-2012 education backfill via `B15002` is possible (verified available 2009-2011)
   but not wired up.
 - Neighborhood overlays don't nest in tracts. Currently display-only, which is the

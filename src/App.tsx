@@ -6,6 +6,7 @@ import { BaselinePicker, RegionPicker } from './components/controls/RegionPicker
 import { Legend } from './components/map/Legend.tsx';
 import { MapView } from './components/map/MapView.tsx';
 import { AreaDetailPanel } from './components/panels/AreaDetailPanel.tsx';
+import { TopListPanel } from './components/panels/TopListPanel.tsx';
 import { TimelineBar } from './components/timeline/TimelineBar.tsx';
 import { loadBaselines, loadManifest, loadRegion } from './data/loaders.ts';
 import { baselineNoun, useBaselineTarget } from './lib/baseline.ts';
@@ -104,6 +105,13 @@ export function App() {
         <AreaDetailPanel />
         <TimelineBar />
       </main>
+
+      {/*
+        A column of its own rather than another card floating over the map:
+        .legend and .detail already hold the map's two top corners, and a third
+        panel there would cover the areas it is ranking.
+      */}
+      <TopListPanel />
     </div>
   );
 }

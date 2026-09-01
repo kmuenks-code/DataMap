@@ -83,6 +83,26 @@ export function indexAgainst(value: number | null, baseline: number | null | und
   return Math.round((value / baseline) * 1000) / 10;
 }
 
+/**
+ * The ancestor baseline series in effect, plus the id it came from.
+ *
+ * Three consumers need this (the map join, the sparkline, the leaderboard) and
+ * every one of them must resolve it identically -- a panel indexed against the
+ * metro while the map is indexed against the US would put two different
+ * meanings of "100" on the same screen. One hook, one answer.
+ */
+export function useBaselineOverride(metricId: string | null) {
+  const baselineRegionId = useActiveBaselineRegionId();
+  const baselineFile = useAppStore((s) =>
+    baselineRegionId ? s.baselines[baselineRegionId] : undefined,
+  );
+  const series = useMemo(
+    () => (baselineRegionId ? baselineSeries(baselineFile, metricId) : null),
+    [baselineRegionId, baselineFile, metricId],
+  );
+  return { baselineRegionId, series };
+}
+
 export interface MapFeatureProps {
   geoid: string;
   name: string;
@@ -107,10 +127,7 @@ export function useMetricData() {
   const region = useAppStore((s) => s.region());
   // The ancestor actually in effect, not merely requested -- so the map and
   // the labels can never disagree about what 100 means. See baseline.ts.
-  const baselineRegionId = useActiveBaselineRegionId();
-  const baselineFile = useAppStore((s) =>
-    baselineRegionId ? s.baselines[baselineRegionId] : undefined,
-  );
+  const { baselineRegionId, series: override } = useBaselineOverride(metricId);
 
   const [file, setFile] = useState<MetricFile | null>(null);
   /**
@@ -155,13 +172,6 @@ export function useMetricData() {
       cancelled = true;
     };
   }, [regionId, geoLevelId, vintage]);
-
-  // Only an ancestor's baseline is an override; the region's own is already
-  // baked into file.index.
-  const override = useMemo(
-    () => (baselineRegionId ? baselineSeries(baselineFile, metricId) : null),
-    [baselineRegionId, baselineFile, metricId],
-  );
 
   const collection = useMemo<FeatureCollection<Geometry, MapFeatureProps> | null>(() => {
     if (!file || !topo || year == null) return null;
@@ -237,16 +247,12 @@ export function useMetricData() {
  * two different denominators would bend for the wrong reason.
  */
 export function useTrend(file: MetricFile | null, geoid: string | null) {
-  const baselineRegionId = useActiveBaselineRegionId();
-  const baselineFile = useAppStore((s) =>
-    baselineRegionId ? s.baselines[baselineRegionId] : undefined,
-  );
+  const { series: override } = useBaselineOverride(file?.metric ?? null);
 
   return useMemo(() => {
     if (!file || !geoid) return null;
     const i = file.geoids.indexOf(geoid);
     if (i === -1) return null;
-    const override = baselineRegionId ? baselineSeries(baselineFile, file.metric) : null;
     return file.years.map((y, yi) => {
       const value = file.values[yi]?.[i] ?? null;
       return {
@@ -255,5 +261,5 @@ export function useTrend(file: MetricFile | null, geoid: string | null) {
         value,
       };
     });
-  }, [file, geoid, baselineRegionId, baselineFile]);
+  }, [file, geoid, override]);
 }

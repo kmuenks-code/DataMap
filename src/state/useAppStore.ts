@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { BaselineFile, Manifest, RegionSummary, ViewMode } from '../data/types.ts';
+import type { RankBasis, RankDirection } from '../lib/stats/leaderboard.ts';
 import { findMetric } from '../data/types.ts';
 
 interface AppState {
@@ -35,6 +36,17 @@ interface AppState {
   /** Dim areas whose estimate is too imprecise to trust. */
   hideUnreliable: boolean;
   playing: boolean;
+  /**
+   * Leaderboard settings. Deliberately NOT derived from viewMode's sibling
+   * controls: what the map colors and what the list ranks on are the same
+   * quantity (viewMode), but "biggest now" versus "grew most since 2009" is an
+   * independent question the reader asks of that same quantity.
+   */
+  topBasis: RankBasis;
+  topDirection: RankDirection;
+  /** Put the areas excluded for wide survey error back into the list. */
+  topShowImprecise: boolean;
+  topOpen: boolean;
 
   setManifest: (m: Manifest) => void;
   setRegionDoc: (doc: RegionSummary) => void;
@@ -50,6 +62,10 @@ interface AppState {
   setSelected: (g: string | null) => void;
   setHideUnreliable: (v: boolean) => void;
   setPlaying: (v: boolean) => void;
+  setTopBasis: (v: RankBasis) => void;
+  setTopDirection: (v: RankDirection) => void;
+  setTopShowImprecise: (v: boolean) => void;
+  setTopOpen: (v: boolean) => void;
 
   region: () => RegionSummary | null;
 }
@@ -69,6 +85,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedGeoid: null,
   hideUnreliable: false,
   playing: false,
+  topBasis: 'level',
+  topDirection: 'highest',
+  topShowImprecise: false,
+  topOpen: true,
 
   /**
    * The root index carries no layer tree, so this only decides WHICH region to
@@ -182,6 +202,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelected: (selectedGeoid) => set({ selectedGeoid }),
   setHideUnreliable: (hideUnreliable) => set({ hideUnreliable }),
   setPlaying: (playing) => set({ playing }),
+  setTopBasis: (topBasis) => set({ topBasis }),
+  setTopDirection: (topDirection) => set({ topDirection }),
+  setTopShowImprecise: (topShowImprecise) => set({ topShowImprecise }),
+  setTopOpen: (topOpen) => set({ topOpen }),
 
   region: () => {
     const { regions, regionId } = get();
