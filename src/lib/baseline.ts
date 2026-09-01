@@ -48,10 +48,9 @@ export function baselineLabel(target: BaselineTarget): string {
  *
  * Every consumer derives from this one function for exactly that reason.
  */
-export function useActiveBaselineRegionId(): string | null {
+export function useActiveBaselineRegionIdFor(metricId: string | null): string | null {
   const regionId = useAppStore((s) => s.regionId);
   const baselineRegionId = useAppStore((s) => s.baselineRegionId);
-  const metricId = useAppStore((s) => s.metricId);
   const file = useAppStore((s) =>
     s.baselineRegionId ? s.baselines[s.baselineRegionId] : undefined,
   );
@@ -60,13 +59,32 @@ export function useActiveBaselineRegionId(): string | null {
 }
 
 /**
+ * The same question for the metric on the map.
+ *
+ * The scatter asks it of two OTHER metrics at once, which is why the metric is
+ * a parameter above: an ancestor that publishes income but not unemployment is
+ * in effect for one axis and not the other, and each axis's label has to follow
+ * its own answer.
+ */
+export function useActiveBaselineRegionId(): string | null {
+  return useActiveBaselineRegionIdFor(useAppStore((s) => s.metricId));
+}
+
+/**
  * The region whose totals are currently the 100% line -- the ancestor in
  * effect if there is one, otherwise the region on screen.
  */
 export function useBaselineTarget(): Pick<RegionSummary, 'kind' | 'label'> | null {
+  return useBaselineTargetFor(useAppStore((s) => s.metricId));
+}
+
+/** The same, for a metric other than the map's -- one scatter axis at a time. */
+export function useBaselineTargetFor(
+  metricId: string | null,
+): Pick<RegionSummary, 'kind' | 'label'> | null {
   const region = useAppStore((s) => s.region());
   const manifest = useAppStore((s) => s.manifest);
-  const activeId = useActiveBaselineRegionId();
+  const activeId = useActiveBaselineRegionIdFor(metricId);
   if (!activeId) return region;
   return manifest?.regions.find((r) => r.id === activeId) ?? region;
 }

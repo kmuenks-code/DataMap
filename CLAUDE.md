@@ -122,6 +122,8 @@ These are correctness traps, not style preferences. Details in `docs/data-source
   because the Aleutians cross the antimeridian.
 - **An overlay** (neighborhoods, districts) → one `layers.json` entry with a `source`
   block pointing at an ArcGIS endpoint. No app code. Only the name field ships.
+- **A metric to the scatter** → nothing. Both axes list the region's whole tree, and a
+  metric absent at the current geo level is disabled rather than hidden.
 - **The 50-state view** → BUILT. `etl/config/regions/us.json`, `kind: "national"`,
   baseline = `us:1`, one geo level (state). Region kind now also picks the baseline
   geography (`baselineForClause()`) and the word the UI uses for it (`src/lib/baseline.ts`).
@@ -148,8 +150,8 @@ npm run build && npm run preview
 
 ## Status
 
-**Working:** the full ETL runs end to end, with 54 passing tests over the transform core,
-the place/geoid logic, the national territory rule and the leaderboard. `public/data/` holds TWO regions:
+**Working:** the full ETL runs end to end, with 73 passing tests over the transform core,
+the place/geoid logic, the national territory rule, the leaderboard and the scatter. `public/data/` holds TWO regions:
 Columbus (9 metrics x 16 years x 3 geo levels, plus one overlay, 2.6 MB) and the US
 (9 metrics x 16 years at state AND county level, 9.2 MB). 12 MB total -- the county
 metric files are ~900 KB each raw, ~310 KB gzipped.
@@ -169,7 +171,20 @@ is showing -- index points when the map is indexed, raw units when it is not -- 
 list and the fill never mean different things.
 Region switching, and a baseline picker that repins 100% to any ancestor region
 (metro -> state -> nation), verified: an Ohio township reads 93% of state and 82% of US.
-**Not yet implemented:** URL state/deep links, and the tract-era crosswalk.
+A **scatter view** swaps in for the map on the same scope -- region x geo level x year x
+baseline all still come from the one store, so switching region moves both. It adds two
+axes, each choosing a metric AND a quantity: value, % of baseline, change in value, or
+change in points. (measure, basis) is the leaderboard's own pair, deliberately: a lone
+"change" mode would not say whether +$8,400 or +14 pts was meant. Axes read independently
+-- an axis whose metric lacks the scrubbed year is drawn at its nearest one and says so --
+and each resolves its own ancestor baseline, since an ancestor may publish one metric and
+not the other. Dots are sized by the region's people-count metric (found by UNIT, never by
+id), a least-squares fit prints r in the space the dots are drawn in, and clicking a dot
+selects the same area the map and Top 10 use. The map is hidden, not unmounted, so pan and
+zoom survive the round trip. Verified in-browser: US/state with population against poverty
+change gives 51 dots; Columbus income against poverty gives r = -0.64.
+**Not yet implemented:** URL state/deep links (which the scatter wants badly -- an axis
+pair is exactly the thing a reader would send someone), and the tract-era crosswalk.
 
 Verified facts (2026-08-29 / 2026-09-01, live API) that override anything ACS docs may suggest:
 - **Statewide fetches work for tract and county subdivision.** `for=tract:*&in=state:39`
@@ -207,6 +222,9 @@ Verified facts (2026-08-29 / 2026-09-01, live API) that override anything ACS do
   small-area noise (105 of 137 places are under 5,000 people). See `docs/geography-notes.md`.
 - **Summary level 070 (`place/remainder`) publishes NO medians** — verified null — and
   needs one request per county subdivision. Evaluated and rejected; don't revisit it.
+- A **`r` over ACS years is descriptive, not a test**: consecutive 5-year estimates share
+  sample (rule 4), so the footer prints that caveat next to the number rather than
+  implying degrees of freedom the data does not have.
 - Overlay labels are **DOM markers, not MapLibre symbol layers**: `text-field` requires a
   `glyphs` URL, i.e. runtime font fetches from a third party. Markers get no collision
   avoidance, so labels hide below zoom 9.5.

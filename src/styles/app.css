@@ -243,3 +243,68 @@ body { background: var(--bg); }
   .detail { display: none; }
   .toplist { display: none; }
 }
+
+/* ---------- scatter stage ---------- */
+/* Without the Top 10 rail there is no third column to reserve. */
+.app.scatter-mode { grid-template-columns: 320px 1fr; }
+
+.stage-pane { position: absolute; inset: 0; }
+/* Hidden, not unmounted: MapLibre keeps its instance, its tiles and the
+   reader's pan and zoom while the scatter is on screen. See App.tsx. */
+.stage-pane.hidden { visibility: hidden; pointer-events: none; }
+
+.scatter {
+  /* Below the floating detail card and timeline (z-index 2), above the map
+     pane it replaces -- which is simply earlier in document order. */
+  position: absolute; inset: 0 0 116px 0; z-index: 1;
+  background: var(--panel);
+}
+.scatter svg { display: block; }
+.scatter-message {
+  position: absolute; inset: 0; display: grid; place-content: center;
+  margin: 0; color: var(--muted); font-size: 13px;
+}
+
+.scatter .grid { stroke: var(--line); stroke-width: 1; }
+/* The line at "no difference" -- 100 for an index, 0 for a change. */
+.scatter .origin { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.7; }
+.scatter .fit { stroke: var(--below); stroke-width: 1.5; stroke-dasharray: 6 4; opacity: 0.8; }
+.scatter .tick-label { font-size: 10px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.scatter .axis-title { font-size: 11px; fill: var(--ink); font-weight: 600; }
+
+.scatter .dot {
+  fill: var(--accent); fill-opacity: 0.5; stroke: #fff; stroke-width: 0.75; cursor: pointer;
+}
+.scatter .dot.imprecise { fill-opacity: 0.18; }
+.scatter .dot.hot { fill-opacity: 0.95; stroke: var(--ink); stroke-width: 1.25; }
+.scatter .dot.sel { fill: var(--below); fill-opacity: 0.9; stroke: var(--ink); stroke-width: 1.5; }
+
+.scatter-tip {
+  position: absolute; z-index: 4; pointer-events: none;
+  transform: translate(14px, -50%); max-width: 240px;
+  background: rgba(255,255,255,0.97); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; font-size: 11px; line-height: 1.45;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.14);
+}
+.scatter-tip.flip { transform: translate(calc(-100% - 14px), -50%); }
+.scatter-tip strong { display: block; font-size: 12px; margin-bottom: 4px; }
+.scatter-tip .tip-row { display: block; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.scatter-tip .tip-metric { display: block; color: var(--muted); font-size: 10px; }
+
+.scatter-foot {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: baseline;
+  padding: 6px 16px; border-top: 1px solid var(--line);
+  font-size: 11px; color: var(--muted); background: var(--panel);
+}
+.scatter-foot .scatter-r { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.scatter-foot .scatter-r small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.scatter-foot .warn-inline { color: var(--below); }
+
+.axis-picker + .axis-picker { margin-top: 4px; }
+.axis-select {
+  width: 100%; margin-bottom: 6px; padding: 6px 8px;
+  border: 1px solid var(--line); border-radius: 8px;
+  font-size: 12px; background: var(--panel); color: var(--ink);
+}
+.scatter-controls .level-note { margin-top: 6px; }

@@ -5,7 +5,7 @@ import type { Topology } from 'topojson-specification';
 
 import { loadGeometry, loadMetric } from './loaders.ts';
 import { geometryVintageFor, layerOf, type BaselineFile, type MetricFile } from './types.ts';
-import { useActiveBaselineRegionId } from '../lib/baseline.ts';
+import { useActiveBaselineRegionIdFor } from '../lib/baseline.ts';
 import { rankAll } from '../lib/stats/ranking.ts';
 import { useAppStore } from '../state/useAppStore.ts';
 
@@ -92,7 +92,10 @@ export function indexAgainst(value: number | null, baseline: number | null | und
  * meanings of "100" on the same screen. One hook, one answer.
  */
 export function useBaselineOverride(metricId: string | null) {
-  const baselineRegionId = useActiveBaselineRegionId();
+  // Resolved FOR THIS METRIC, not for the map's: the scatter calls this hook
+  // twice with two different metrics, and an ancestor that publishes one but
+  // not the other is in effect for one axis only.
+  const baselineRegionId = useActiveBaselineRegionIdFor(metricId);
   const baselineFile = useAppStore((s) =>
     baselineRegionId ? s.baselines[baselineRegionId] : undefined,
   );
