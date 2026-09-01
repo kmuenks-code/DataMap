@@ -1,8 +1,21 @@
 {
   "schema": 3,
-  "generatedAt": "2026-09-01T16:28:29.711Z",
+  "generatedAt": "2026-09-01T16:39:20.368Z",
   "defaultRegion": "columbus-oh",
   "regions": [
+    {
+      "id": "alaska",
+      "label": "Alaska",
+      "kind": "state",
+      "center": [
+        0.3136,
+        61.3067
+      ],
+      "zoom": 4,
+      "parent": "us",
+      "geoLevelCount": 3,
+      "metricCount": 9
+    },
     {
       "id": "columbus-oh",
       "label": "Greater Columbus, OH",
