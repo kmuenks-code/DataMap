@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "generatedAt": "2026-09-01T16:39:20.368Z",
+  "generatedAt": "2026-09-02T14:04:52.021Z",
   "defaultRegion": "columbus-oh",
   "regions": [
     {
@@ -40,7 +40,7 @@
       "zoom": 6,
       "parent": "us",
       "geoLevelCount": 3,
-      "metricCount": 9
+      "metricCount": 12
     },
     {
       "id": "us",
@@ -52,7 +52,7 @@
       ],
       "zoom": 3,
       "geoLevelCount": 2,
-      "metricCount": 9
+      "metricCount": 12
     }
   ]
 }

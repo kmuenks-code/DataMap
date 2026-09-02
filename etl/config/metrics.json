@@ -128,6 +128,54 @@
       "baseline": "published",
       "baselineVar": "B01002_001E",
       "higherIsBetter": null
+    },
+
+    {
+      "id": "presidential-votes",
+      "label": "Presidential Votes Cast",
+      "layer": "elections",
+      "group": "turnout",
+      "kind": "count",
+      "unit": "votes",
+      "source": { "dataset": "medsl/countypres", "value": "totalvotes" },
+      "baseline": "aggregate",
+      "higherIsBetter": null,
+      "description": "Total ballots cast for president. NOT a turnout rate: that needs a citizen-voting-age denominator (the Census CVAP special tabulation), which this project does not yet carry. Read it as a count of voters, not as participation.",
+      "_note": "Read from the file's totalvotes COLUMN, never by summing candidates -- Wisconsin and Idaho 2024 carry a TOTAL VOTES CAST summary row that makes a naive sum exactly double. See sources/medsl/countyPresident.ts."
+    },
+    {
+      "id": "presidential-dem-share",
+      "label": "Democratic Vote Share",
+      "layer": "elections",
+      "group": "results",
+      "kind": "rate",
+      "unit": "percent",
+      "source": {
+        "dataset": "medsl/countypres",
+        "numerator": "DEMOCRAT",
+        "denominator": "totalvotes"
+      },
+      "baseline": "aggregate",
+      "higherIsBetter": null,
+      "description": "Democratic presidential votes as a share of all ballots cast. Aggregated from votes and totals, never by averaging county percentages -- rule 1's logic applied to votes."
+    },
+    {
+      "id": "presidential-rep-share",
+      "label": "Republican Vote Share",
+      "layer": "elections",
+      "group": "results",
+      "kind": "rate",
+      "unit": "percent",
+      "source": {
+        "dataset": "medsl/countypres",
+        "numerator": "REPUBLICAN",
+        "denominator": "totalvotes"
+      },
+      "baseline": "aggregate",
+      "higherIsBetter": null,
+      "description": "Republican presidential votes as a share of all ballots cast."
     }
-  ]
+  ],
+
+  "_no_margin_metric": "A signed margin (rep minus dem) is deliberately absent. The index is 100 * area / baseline, which is meaningless for a quantity that crosses zero -- a county at +0.1 points against a national +1.0 would index at 10, and one at -0.1 at -10, numbers that look like a scale but are not one. The two shares carry the same information and both index correctly."
 }

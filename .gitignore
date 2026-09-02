@@ -8,6 +8,10 @@ dist/
 etl/.cache/
 etl/.tmp/
 
+# Hand-downloaded upstream files (see docs/data-sources.md). Same reasoning as
+# the cache: large, regenerable, and re-obtainable from the DOI on record.
+etl/vendor/
+
 # Editor / OS
 .DS_Store
 .vscode/

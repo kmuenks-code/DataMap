@@ -19,7 +19,9 @@ If a change would make the browser call an external API, it is the wrong change.
 etl/            Build-time data pipeline (Node + tsx). Never imported by src/.
   config/       layers.json + metrics.json + regions/*.json + states.json -- the registries
                 regions/_state-template.json expands into all 51 state regions
-  src/sources/  census/ (ACS), tiger/ (boundaries); future: osm/, noaa/
+  src/sources/  census/ (ACS), tiger/ (boundaries), medsl/ (elections); future: osm/, noaa/
+                A metric's source.dataset routes it to its builder; unrouted = build error
+  vendor/       Hand-downloaded upstream files. Gitignored, optional. See data-sources.md
   src/transform/ normalize.ts (index math), crosswalk.ts, pack.ts (output format)
   .cache/       Raw upstream responses, content-addressed. Gitignored.
 public/data/    ETL OUTPUT. Committed. This is the site's database.
@@ -108,13 +110,22 @@ These are correctness traps, not style preferences. Details in `docs/data-source
 9. **Places don't tile the metro.** 137 places hold 78.2% of the population; the other
    21.8% is unincorporated and blank. Never pool a rate baseline over a level with
    `tilesRegion: false` — it would redefine "100" as the incorporated-population rate.
+10. **A five-digit numeric geoid can still be the wrong place.** MEDSL codes Kansas City
+   as `36000` on a Missouri row — and `36` is New York. Validate the geoid against the
+   row's own state, not just its shape; it filed 124,288 votes in the wrong state before
+   the check existed. Related: a county part of `000` is never a county.
+11. **Never index a signed quantity.** `100 * area / baseline` is meaningless for anything
+   that crosses zero — a vote margin of +0.1 against a national +1.0 indexes at 10, and
+   −0.1 at −10. That is why the elections layer ships two shares and no margin metric.
 
 ## Adding things
 
 - **A metric** → one entry in `etl/config/metrics.json` (tagged with `layer` + `group`),
   re-run the ETL. No app code. Dangling layer/group refs fail the build.
 - **A data domain** (politics, weather, transit) → one entry in `etl/config/layers.json`
-  plus a fetcher under `etl/src/sources/` emitting the standard `MetricFile`. No app code.
+  plus a fetcher under `etl/src/sources/` emitting the standard `MetricFile`, and a branch
+  in `runPipeline`'s router keyed on `source.dataset`. No app code. **DONE for politics** —
+  `medsl/` is the worked example, including its own geographies and its own cadence.
 - **A city** → one file in `etl/config/regions/`. No app code.
 - **A state** → nothing. All 51 expand from `regions/_state-template.json` + `states.json`
   (itself generated from the API). Editing what a state region contains is ONE edit, not 51.
@@ -139,6 +150,8 @@ fix that instead.
 npm run dev                 # local site
 npm run etl:columbus        # rebuild all Columbus data (cached; ~0 requests on re-run)
 npm run etl:us              # rebuild the national (state + county) region
+npm run etl:elections       # elections layer only, national region (2s, 1 file fetched)
+npm run etl -- --states --only metrics --metric presidential-dem-share   # every state
 npm run etl:states          # all 50 states + DC (~7.5 h cold; see docs/deployment.md)
 npm run etl -- --region ohio
 npm run etl -- --region columbus-oh --metric median-household-income
@@ -146,15 +159,27 @@ npm run build && npm run preview
 ```
 
 `CENSUS_API_KEY` lives in `.env` (gitignored) — required, ETL only, deliberately *not*
-`VITE_`-prefixed so Vite cannot inline it into the bundle.
+`VITE_`-prefixed so Vite cannot inline it into the bundle. `DATAVERSE_NAME/EMAIL/
+INSTITUTION/POSITION` join it there, required only for the elections layer: MEDSL's file
+sits behind a required Dataverse guestbook. No account or token needed — or skip it
+entirely by dropping the file at `etl/vendor/`. See `docs/data-sources.md`.
 
 ## Status
 
-**Working:** the full ETL runs end to end, with 73 passing tests over the transform core,
-the place/geoid logic, the national territory rule, the leaderboard and the scatter. `public/data/` holds TWO regions:
-Columbus (9 metrics x 16 years x 3 geo levels, plus one overlay, 2.6 MB) and the US
-(9 metrics x 16 years at state AND county level, 9.2 MB). 12 MB total -- the county
-metric files are ~900 KB each raw, ~310 KB gzipped.
+**Working:** the full ETL runs end to end, with 100 passing tests over the transform core,
+the place/geoid logic, the national territory rule, the leaderboard, the scatter and the
+MEDSL election parse. `public/data/` holds Columbus
+(9 metrics x 16 years x 3 geo levels, plus one overlay, 2.6 MB) and the US
+(9 ACS metrics x 16 years plus 3 election metrics x 7 elections, at state AND county
+level, 9.2 MB) -- the county metric files are ~900 KB each raw, ~310 KB gzipped.
+A **second data domain is live**: the `elections` layer, built from a MEDSL CSV rather
+than the Census API, proving the source abstraction holds for a provider with its own
+cadence, geographies and file format. Details and its five measured data traps are in
+`docs/data-sources.md`; the two structural ones are that Alaska reports by house district
+under codes that collide with borough FIPS (dropped at county, summed at state) and that
+Connecticut's returns stay on legacy counties while our post-2022 boundaries are planning
+regions (blank from 2022). Verified against certified results: 2024 national shares come
+out 48.307% D / 49.828% R.
 Cold build = 404 requests / ~4.5 min; any rebuild after that = 0 requests / 1.2s.
 Partial runs (`--metric`, `--years`, `--geo`) splice into existing files rather than
 truncating them, so incremental refresh is the normal path.
@@ -185,6 +210,8 @@ zoom survive the round trip. Verified in-browser: US/state with population again
 change gives 51 dots; Columbus income against poverty gives r = -0.64.
 **Not yet implemented:** URL state/deep links (which the scatter wants badly -- an axis
 pair is exactly the thing a reader would send someone), and the tract-era crosswalk.
+Columbus shows no elections because it declares no `county` geo level; adding one is a
+config-only change, and would give the metro its 10 counties across seven elections.
 
 Verified facts (2026-08-29 / 2026-09-01, live API) that override anything ACS docs may suggest:
 - **Statewide fetches work for tract and county subdivision.** `for=tract:*&in=state:39`
@@ -212,7 +239,16 @@ Verified facts (2026-08-29 / 2026-09-01, live API) that override anything ACS do
   cross the antimeridian, so Alaska spans -178.9 to +179.8 and the collection measures
   358.6 degrees wide; fitting it zooms out to the whole globe. A region may declare
   `fitBounds` for this; AK/HI insets are not built.
-- ACS5 is published for **2009-2024**; 2025 returns 404.
+- **Google Civic Information API is not an election-results source and never was.** It
+  serves ballot/voter-facing data, is address-keyed rather than area-keyed, and its
+  Representatives endpoints were turned down 2025-04-30. Nothing to revisit.
+- **Election geography agrees with ours only at county and above.** Precincts nest inside
+  no census geography; agreement is exact at county and state, absent at tract, county
+  subdivision and place. `precinct` is deliberately NOT a geo level -- see
+  `docs/data-sources.md` for what it would cost and for the block-disaggregation route if
+  sub-county politics is ever wanted.
+- ACS5 is published for **2009-2024**; 2025 returns 404. MEDSL county presidential returns
+  cover **2000-2024**, seven elections, which is a longer span than any ACS metric here.
 - Default geo level is **county-subdivision** (townships/cities), chosen for timeline
   integrity; tract is available and better-looking but has a broken pre-2020 series.
 - **`place` is the colloquial geography** — Dublin, Upper Arlington, Hilliard on real

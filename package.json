@@ -16,6 +16,7 @@
     "etl:columbus": "tsx etl/src/index.ts --region columbus-oh",
     "etl:us": "tsx etl/src/index.ts --region us",
     "etl:states": "tsx etl/src/index.ts --states",
+    "etl:elections": "tsx etl/src/index.ts --region us --only metrics --metric presidential-votes --metric presidential-dem-share --metric presidential-rep-share",
     "etl:latest": "tsx etl/src/index.ts --region columbus-oh --years 2024"
   },
   "dependencies": {

@@ -14,6 +14,7 @@ import type { GeoLevelDef, LayerDef, MetricDef, RegionDef } from './config.ts';
 import { MAX_VARS_PER_CALL, fetchCensus, parseEstimate } from './sources/census/client.ts';
 import { placeGeoidsForRegion, restrictPlaces } from './sources/census/places.ts';
 import { isUsState } from './sources/census/states.ts';
+import { MEDSL_DATASET, buildElections } from './sources/medsl/elections.ts';
 import { boundaryVintageForYear, canonicalGeoid } from './transform/crosswalk.ts';
 import {
   coefficientOfVariation,
@@ -315,12 +316,36 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
   const layers = await loadLayers();
   // orderMetrics also drops metrics whose layer is disabled, so a layer can be
   // switched off in config without deleting its registry entries.
-  const allMetrics = orderMetrics(await loadMetrics(), layers);
+  const registered = orderMetrics(await loadMetrics(), layers);
+
+  // Route by the metric's own source. A metric declares where its numbers come
+  // from (`source.dataset`), and that -- not its layer, and not a switch in
+  // this file -- is what decides which builder claims it. A new domain adds a
+  // branch here and a directory under sources/; nothing else changes.
+  const censusMetrics = registered.filter((m) => m.source.dataset.startsWith('acs/'));
+  const electionMetrics = registered.filter((m) => m.source.dataset === MEDSL_DATASET);
+
+  const unrouted = registered.filter(
+    (m) => !censusMetrics.includes(m) && !electionMetrics.includes(m),
+  );
+  if (unrouted.length > 0) {
+    // Silence here would mean a metric that validates, appears in no output,
+    // and is missing from the manifest with nothing to explain why.
+    throw new Error(
+      'No builder claims these metrics -- check source.dataset:\n  - ' +
+        unrouted.map((m) => `${m.id} (dataset "${m.source.dataset}")`).join('\n  - '),
+    );
+  }
 
   const metrics = opts.metrics?.length
-    ? allMetrics.filter((m) => opts.metrics!.includes(m.id))
-    : allMetrics;
-  if (metrics.length === 0) throw new Error('No metrics matched the --metric filter');
+    ? censusMetrics.filter((m) => opts.metrics!.includes(m.id))
+    : censusMetrics;
+  const wantedElections = opts.metrics?.length
+    ? electionMetrics.filter((m) => opts.metrics!.includes(m.id))
+    : electionMetrics;
+  if (metrics.length === 0 && wantedElections.length === 0) {
+    throw new Error('No metrics matched the --metric filter');
+  }
 
   const levels = region.geoLevels.filter(
     (l) => l.enabled !== false && (!opts.geoLevels?.length || opts.geoLevels.includes(l.id)),
@@ -330,7 +355,11 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
   for (let y = region.years.min; y <= region.years.max; y++) allYears.push(y);
   const years = opts.years?.length ? allYears.filter((y) => opts.years!.includes(y)) : allYears;
 
-  for (const level of levels) {
+  // Skipped wholesale when --metric named only election metrics: the fetch loop
+  // below deliberately requests every registered census variable regardless of
+  // the filter (to keep the cache key filter-independent), which on a cold
+  // cache would be hundreds of requests for output nobody asked for.
+  for (const level of metrics.length > 0 ? levels : []) {
     console.log(`\n=== ${region.id} / ${level.id} ===`);
 
     // A fetch that reaches beyond the region must say how it is cut back down.
@@ -359,7 +388,7 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
       // filter narrow this would make every filtered run miss the cache and
       // re-fetch. Fetching the year's full superset keeps the cache
       // filter-independent: a narrowed re-run costs zero requests.
-      const active = allMetrics.filter((m) => availableIn(m, year));
+      const active = censusMetrics.filter((m) => availableIn(m, year));
       if (active.length === 0) continue;
       const vars = [...new Set(active.flatMap(variablesFor))];
       process.stdout.write(`  ${year} (${vars.length} vars) ... `);
@@ -499,7 +528,19 @@ export async function runPipeline(opts: RunOptions): Promise<void> {
     }
   }
 
-  await writeRegionManifest(region, allMetrics, layers);
+  // Before the manifest and baselines, both of which are built by SCANNING the
+  // output directory -- a metric written after them would exist on disk and be
+  // invisible to the app.
+  if (wantedElections.length > 0) {
+    await buildElections(region, wantedElections, {
+      years: opts.years,
+      geoLevels: opts.geoLevels,
+    });
+  }
+
+  // Every registered metric, not just the census ones: the manifest IS the
+  // navigation model, so a layer missing from it is a layer the UI cannot reach.
+  await writeRegionManifest(region, registered, layers);
   await writeBaselines(region);
   await writeRootManifest();
 }

@@ -33,7 +33,16 @@ Conflating the two is the mistake worth avoiding: "show me median income *and* n
 
 No app code changes. `loadMetrics()` validates every `layer`/`group` reference at build time and fails the run on a dangling one — otherwise a typo produces a file on disk that no navigation path reaches, which is far harder to notice than a crash.
 
-Set `enabled: false` to hide a layer without deleting its registry entries. The `elections`, `weather`, and `osm-features` layers are still declared that way — they are structural placeholders proving the shape works, not stubs to be filled in blindly.
+Set `enabled: false` to hide a layer without deleting its registry entries. The `weather` and `osm-features` layers are still declared that way — they are structural placeholders proving the shape works, not stubs to be filled in blindly.
+
+The `elections` layer is now **live**, and it is the worked example of the *second source* half of the claim above: a domain with its own provider, its own cadence, its own geographies and its own file format, added as one `layers.json` entry, three `metrics.json` entries and a directory under `etl/src/sources/medsl/`. No app code, and nothing downstream — manifest writer, baseline writer, map, Top 10, scatter — learns that a second kind of source exists.
+
+What routes a metric to its builder is its own `source.dataset`: `acs/acs5` goes to the census path, `medsl/countypres` to the elections path, and a metric no builder claims **fails the build** rather than silently producing nothing. That is the extension point for the next domain.
+
+Two things the elections layer proves about the taxonomy:
+
+- **`geoLevels` really is per-layer.** It declares `["county", "state"]` and nothing else, because the county is the finest geography where returns and census polygons describe the same ground. A region without one of those levels simply never shows the layer — Alaska's county level builds zero areas, and the manifest's empty-group pruning removes the layer from its picker entirely, so there is no dead toggle.
+- **`metric.years` really is per-metric.** Elections are quadrennial and run 2000-2024; ACS is annual and runs 2009-2024. The scrubber is indexed by position in the selected metric's own years, so it shows seven stops rather than sixteen, and the scatter draws an axis at its nearest published year and says so ("2020 (nearest published)") when the scrubbed year has no election.
 
 The `neighborhoods` overlay is now **live**, and it is the worked example of the overlay half of the taxonomy: one entry in `layers.json` carrying a `source` block, one generic fetcher (`etl/src/sources/arcgis/overlays.ts`), and no app code. An overlay layer declares where its geometry comes from:
 
@@ -57,7 +66,7 @@ The `neighborhoods` overlay is now **live**, and it is the worked example of the
 
 **Whether a level covers the region.** `tilesRegion: false` marks a level whose areas leave gaps — places miss 22% of the metro's population. It changes two things: rate baselines come from the published CBSA figures instead of being pooled from the areas on screen, and the UI shows the level's `note` so blank ground does not read as missing data.
 
-**Cadence.** ACS is annual, elections biennial, weather daily. The timeline should reflect the metric's real years (`metric.years`), never a global range.
+**Cadence.** ACS is annual, presidential elections quadrennial, weather daily. The timeline reflects the metric's real years (`metric.years`), never a global range — and so must any caveat attached to those years. The tick tooltip's "5-year estimate; overlaps neighbouring years" is true of ACS and false of certified returns; it keys off whether the file ships a CV, since a source with no margin of error is not a sample and has no overlapping sample to warn about.
 
 **Shape of the source.** Weather arrives as station *points*, not polygons, so it needs interpolation onto areas before it can be a choropleth — and that interpolation is an estimate that has to be disclosed. Not every dataset is choropleth-ready.
 

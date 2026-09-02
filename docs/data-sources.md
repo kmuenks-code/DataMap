@@ -145,10 +145,142 @@ raster tile template. Options, best first:
    no automatic collision avoidance, so labels are hidden below a zoom threshold rather
    than allowed to pile up.
 
+## MIT Election Lab — county presidential returns
+
+"County Presidential Election Returns 2000-2024", `doi:10.7910/DVN/VOQCHQ`, CC0 1.0.
+One 10 MB CSV covering seven presidential elections. Fetched by
+`etl/src/sources/medsl/`, which emits the same `MetricFile` shape the ACS path does.
+
+### Why county, and not precinct
+
+Returns are reported natively by **precinct**, and precincts nest inside nothing this
+project draws — not tracts, not county subdivisions, not places. Agreement with our
+geographies is exact at county and above, and absent below it:
+
+| Geo level | Agrees with election geography? |
+|---|---|
+| `state` | Exact. Canvass is published by state. |
+| `county` | Exact. The county is the canvassing unit nationwide. |
+| `county-subdivision` | No. Ohio precincts mostly sit inside one township, but the returns carry no cousub code, and "mostly" is not a join key. |
+| `place` | No — and `tilesRegion: false` forbids a pooled rate baseline there anyway (rule 9). |
+| `tract` | No. Precincts and tracts genuinely cross. |
+
+Precinct is deliberately **not** a geo level. VEST publishes precinct shapefiles joined to
+results (`doi:10.7910/DVN/K7760H`, CC BY 4.0), but they would need geometry per election
+cycle, carry no stable ids across years, and join to no other metric here — the scatter
+and the baseline picker would both go dark at that level. If sub-county politics is ever
+wanted, the honest route is the **block disaggregation** VEST and the Redistricting Data
+Hub publish: precinct results apportioned onto 2020 census blocks, which nest exactly into
+every level we already have. Those values are estimates and would carry the same
+disclosure burden as the unbuilt weather interpolation.
+
+### Getting the file: the guestbook
+
+MEDSL's datasets sit behind a **required Dataverse guestbook**, and it fails the way the
+Census API does — HTTP 200 with a JSON error body, so `res.ok` proves nothing:
+
+```json
+{"status":"ERROR","message":"You may not download this file without the required Guestbook response for guestbookID 458."}
+```
+
+The documented way through is a POST of the guestbook response to the same endpoint, which
+returns a short-lived signed URL. No account or API token is needed, but the depositor
+marked name/email/institution/position **required**, so the ETL supplies them from `.env`
+and refuses to run without them:
+
+```
+DATAVERSE_NAME=
+DATAVERSE_EMAIL=
+DATAVERSE_INSTITUTION=
+DATAVERSE_POSITION=
+```
+
+The server will in fact issue a signed URL for a blank response. Sending blanks anyway
+would be evading a disclosure the depositor asked for in exchange for the data, so the
+build does not do it. The alternative is to download the file once in a browser and drop
+it at `etl/vendor/countypres_2000-2024.csv`, which is used as-is with no request made.
+That directory is gitignored for the same reason `.cache/` is.
+
+### Five quirks, all measured against the released file (version 20260225)
+
+1. **`totalvotes` is a column, not a sum.** Wisconsin and Idaho 2024 carry a
+   `TOTAL VOTES CAST` row alongside the real candidates, so summing candidate rows returns
+   **exactly double** the state's turnout — measured, WI 2024 came out 6,845,836 against an
+   actual 3,422,918 — while every vote share stays plausible, because numerator and
+   denominator inflate together. Read the total from the column; sum candidates only for
+   party numerators, skipping rows with an empty `party` (`TOTAL VOTES CAST`, `UNDERVOTES`,
+   `OVERVOTES`, `SPOILED`).
+2. **`mode` is not uniform.** 29 state-years break the count out by how the ballot was
+   cast, and AZ/AR/IA/LA in 2024 publish **both** the modes and a `TOTAL`. Summing
+   everything double-counts those; filtering to `TOTAL` loses GA and NC in 2020, which
+   publish no such row. Rule: prefer `TOTAL` where a county has one, else sum its modes.
+   Verified by reconstruction — Missouri 2020 comes out at 3,025,962, its official
+   statewide total to the vote.
+3. **Alaska is not boroughs.** It reports by state house district, coded `02001`-`02040`,
+   which **collide with real borough FIPS**: `02013` is Aleutians East, `02016` Aleutians
+   West, `02020` Anchorage. Joined by geoid, House District 20's returns would render as
+   Anchorage's. Alaska is therefore dropped at county level and blank on that map. It is
+   kept at state level, where the districts tile the state and their sum is correct
+   (measured 2012: 300,495, matching the official figure).
+4. **A geoid can name the wrong state.** 2024 codes Kansas City as `36000` — the place
+   geoid `2938000` with its state prefix lost — on a row whose `state_po` is `MO`. Five
+   digits, all numeric, passes every shape test, and `36` is **New York**. Before the guard
+   existed the state rollup filed 124,288 Missouri votes under New York. Two checks catch
+   it: a county part of `000` is never a county, and the geoid's state prefix must match
+   the row's own `state_po` (mapped from the file by majority, so no hand-kept table can
+   drift).
+5. **Connecticut stays on legacy counties.** The returns use the eight pre-2022 counties
+   through 2024, while our boundaries from 2022 on are the nine planning regions under new
+   GEOIDs. They do not nest, so **Connecticut is blank from 2022** rather than crosswalked.
+   2020 and earlier join fine.
+
+Smaller deliberate gaps: ballots belonging to no county (CT statewide write-in, ME UOCAVA,
+RI federal precinct — about 3,400 votes nationally in 2020) and Kansas City's 136,645,
+which Missouri reports separately from the four counties it spans. Both are dropped rather
+than misattributed, the same call `crosswalk.ts` makes for Bedford city.
+
+Oglala Lakota is published under its **retired** code `46113` in 2024 and the current
+`46102` in 2016/2020; the project's existing rename table folds it, so it stays one series.
+
+### What the numbers come out as
+
+Reconstructed national shares against certified results:
+
+| Year | Built (state level) | Certified |
+|---|---|---|
+| 2024 | 48.307% D / 49.828% R | 48.3 / 49.8 |
+| 2020 | 51.254% D / 46.857% R | 51.3 / 46.8 |
+| 2016 | 48.212% D / 46.167% R | 48.2 / 46.1 |
+
+Raw totals run slightly light — 2024 sums to 155,085,264 — because MEDSL's file trails
+late canvass updates in a few states (NY, CA and OH are each 100-200k short). The
+**shares** are the load-bearing figures and they land within 0.03 points.
+
+The county-level baseline differs from the state-level one in the second decimal (2024:
+48.322% against 48.307%) because Alaska is absent from one and present in the other. That
+is the intended behaviour, not drift: each level's 100% line is pooled from the areas that
+level actually draws.
+
+### The metrics, and the one that is missing
+
+`presidential-votes` (count), `presidential-dem-share` and `presidential-rep-share`
+(rates, aggregated from votes and totals — never by averaging county percentages, which is
+rule 1's logic arriving through votes rather than medians).
+
+A signed **margin** metric is deliberately absent. The index is `100 * area / baseline`,
+which is meaningless for a quantity that crosses zero: a county at +0.1 points against a
+national +1.0 would index at 10, and one at −0.1 at −10 — numbers that look like a scale
+and are not one. The two shares carry the same information and both index correctly.
+
+`presidential-votes` is a **count of ballots, not a turnout rate**. A real turnout rate
+needs a citizen-voting-age denominator (the Census CVAP special tabulation), which this
+project does not yet carry.
+
 ## Future sources (deferred, but the architecture leaves room)
 
 | Source | Endpoint | Notes |
 |---|---|---|
+| Census CVAP special tabulation | `census.gov/programs-surveys/decennial-census/about/voting-rights/cvap.html` | Static CSVs. The missing denominator that would turn `presidential-votes` into a real turnout rate. |
 | NOAA/NWS historical weather | `ncei.noaa.gov/cdo-web/api/v2` | Token required; daily summaries by station. Points, not polygons — needs interpolation to areas. |
 | OpenStreetMap features | Overpass API | Heavily rate-limited; extract once at build time, never at runtime. |
 | BLS employment | `api.bls.gov/publicAPI/v2` | County-level; 500 queries/day registered. |

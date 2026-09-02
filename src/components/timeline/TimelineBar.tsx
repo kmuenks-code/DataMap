@@ -35,6 +35,12 @@ export function TimelineBar() {
 
   if (!metric || year == null || years.length === 0) return null;
 
+  // A CV is shipped only where the source had a margin of error, so its
+  // presence IS the question "is this a sample?" -- and the overlapping-sample
+  // caveat below is meaningless for anything else. Election returns are
+  // certified counts and carry none; labelling them "5-year estimate" would be
+  // a plainly false statement about the data on screen.
+  const isSurvey = Boolean(file?.cv);
   const idx = years.indexOf(year);
   const selectedName = trend ? file?.names[file.geoids.indexOf(selectedGeoid!)] : null;
 
@@ -78,13 +84,7 @@ export function TimelineBar() {
             key={y}
             className={`tick${y === year ? ' active' : ''}`}
             onClick={() => setYear(y)}
-            // ACS 5-year estimates overlap: 2023 and 2024 share four years of
-            // sample. Non-overlapping years are the honest comparisons.
-            title={
-              (y - years[0]!) % 5 === 0
-                ? `${y} — non-overlapping with ${years[0]}`
-                : `${y} (5-year estimate; overlaps neighbouring years)`
-            }
+            title={tickTitle(y, years, isSurvey)}
           >
             {String(y).slice(2)}
           </button>
@@ -92,6 +92,23 @@ export function TimelineBar() {
       </div>
     </div>
   );
+}
+
+/**
+ * What one year tick claims about its own comparability.
+ *
+ * ACS 5-year estimates overlap -- 2023 and 2024 share four years of sample --
+ * so the honest comparisons are the non-overlapping ones, and the tick says
+ * which those are. A source that is not a survey has no such caveat to make:
+ * two presidential elections four years apart share no sample because neither
+ * is a sample.
+ */
+export function tickTitle(year: number, years: number[], isSurvey: boolean): string {
+  if (!isSurvey) return String(year);
+  const first = years[0]!;
+  return (year - first) % 5 === 0
+    ? `${year} — non-overlapping with ${first}`
+    : `${year} (5-year estimate; overlaps neighbouring years)`;
 }
 
 /**

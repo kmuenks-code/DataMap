@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "generatedAt": "2026-09-01T16:11:12.094Z",
+  "generatedAt": "2026-09-02T13:59:04.941Z",
   "id": "us",
   "label": "United States",
   "kind": "national",
@@ -317,6 +317,90 @@
                 2021,
                 2022,
                 2023,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "state"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "elections",
+      "label": "Politics & Elections",
+      "kind": "metric",
+      "description": "Certified presidential general election returns by county, 2000-2024. Election geography is precincts, which nest inside nothing this project draws -- not tracts, not townships, not places. The COUNTY is the canvassing unit everywhere, so it is the finest geography where returns and census polygons describe the same ground without interpolation.",
+      "attribution": "MIT Election Data and Science Lab, County Presidential Election Returns 2000-2024",
+      "groups": [
+        {
+          "id": "turnout",
+          "label": "Turnout",
+          "metrics": [
+            {
+              "id": "presidential-votes",
+              "label": "Presidential Votes Cast",
+              "unit": "votes",
+              "kind": "count",
+              "higherIsBetter": null,
+              "description": "Total ballots cast for president. NOT a turnout rate: that needs a citizen-voting-age denominator (the Census CVAP special tabulation), which this project does not yet carry. Read it as a count of voters, not as participation.",
+              "years": [
+                2000,
+                2004,
+                2008,
+                2012,
+                2016,
+                2020,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "state"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "results",
+          "label": "Results & Margins",
+          "metrics": [
+            {
+              "id": "presidential-dem-share",
+              "label": "Democratic Vote Share",
+              "unit": "percent",
+              "kind": "rate",
+              "higherIsBetter": null,
+              "description": "Democratic presidential votes as a share of all ballots cast. Aggregated from votes and totals, never by averaging county percentages -- rule 1's logic applied to votes.",
+              "years": [
+                2000,
+                2004,
+                2008,
+                2012,
+                2016,
+                2020,
+                2024
+              ],
+              "geoLevels": [
+                "county",
+                "state"
+              ]
+            },
+            {
+              "id": "presidential-rep-share",
+              "label": "Republican Vote Share",
+              "unit": "percent",
+              "kind": "rate",
+              "higherIsBetter": null,
+              "description": "Republican presidential votes as a share of all ballots cast.",
+              "years": [
+                2000,
+                2004,
+                2008,
+                2012,
+                2016,
+                2020,
                 2024
               ],
               "geoLevels": [

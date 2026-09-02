@@ -34,17 +34,19 @@
       "id": "elections",
       "label": "Politics & Elections",
       "kind": "metric",
-      "enabled": false,
+      "enabled": true,
       "order": 20,
-      "description": "Precinct and county election returns. NOTE: election geography is precincts, which do not nest inside census tracts and are redrawn frequently. Expect this layer to declare its own geoLevels rather than reusing the census ones -- which is exactly why geoLevels is a per-layer field.",
+      "description": "Certified presidential general election returns by county, 2000-2024. Election geography is precincts, which nest inside nothing this project draws -- not tracts, not townships, not places. The COUNTY is the canvassing unit everywhere, so it is the finest geography where returns and census polygons describe the same ground without interpolation.",
       "provider": {
-        "name": "Ohio Secretary of State / MIT Election Lab",
-        "url": "https://electionlab.mit.edu/data",
-        "attribution": "MIT Election Data and Science Lab",
-        "license": "CC-BY"
+        "name": "MIT Election Data and Science Lab",
+        "url": "https://doi.org/10.7910/DVN/VOQCHQ",
+        "attribution": "MIT Election Data and Science Lab, County Presidential Election Returns 2000-2024",
+        "license": "CC0-1.0"
       },
-      "cadence": "biennial",
-      "geoLevels": ["county", "precinct"],
+      "_license_note": "VERIFIED 2026-09-02 from the Dataverse dataset metadata: CC0 1.0, not CC-BY as this entry previously claimed. MEDSL still asks to be cited, which is what provider.attribution is for.",
+      "_geography_note": "'precinct' is deliberately NOT listed. Precinct returns exist (VEST, doi:10.7910/DVN/K7760H) but would need geometry per election cycle, carry no stable ids across years, and join to no other metric in this project -- the scatter and the baseline picker would both go dark there. Sub-county politics wants the block-disaggregation route instead; see docs/data-sources.md.",
+      "cadence": "quadrennial",
+      "geoLevels": ["county", "state"],
       "groups": [
         { "id": "turnout", "label": "Turnout", "order": 10 },
         { "id": "results", "label": "Results & Margins", "order": 20 }
